@@ -23,11 +23,17 @@ const memoryCache = new Map<string, CacheEntry<unknown>>();
 
 export class PublicTargetError extends Error {
   status: number;
+  code: string;
+  retryable: boolean;
+  details?: string;
 
-  constructor(message: string, status = 400) {
+  constructor(message: string, status = 400, code = 'INVALID_TARGET', retryable = false, details?: string) {
     super(message);
     this.name = 'PublicTargetError';
     this.status = status;
+    this.code = code;
+    this.retryable = retryable;
+    this.details = details;
   }
 }
 
@@ -37,7 +43,41 @@ export function errorMessage(error: unknown, fallback = 'Internal Server Error')
 
 export function jsonError(error: unknown, fallback = 'Internal Server Error') {
   const status = error instanceof PublicTargetError ? error.status : 500;
-  return NextResponse.json({ success: false, error: errorMessage(error, fallback) }, { status });
+  const message = errorMessage(error, fallback);
+  const errorCode = error instanceof PublicTargetError ? error.code : 'INTERNAL_ERROR';
+  const retryable = error instanceof PublicTargetError ? error.retryable : status >= 500;
+  const details = error instanceof PublicTargetError ? error.details : undefined;
+  return NextResponse.json(
+    {
+      success: false,
+      errorCode,
+      message,
+      details,
+      retryable,
+      error: message,
+    },
+    { status }
+  );
+}
+
+export function errorResponse(
+  message: string,
+  status = 400,
+  errorCode = 'BAD_REQUEST',
+  retryable = false,
+  details?: string
+) {
+  return NextResponse.json(
+    {
+      success: false,
+      errorCode,
+      message,
+      details,
+      retryable,
+      error: message,
+    },
+    { status }
+  );
 }
 
 export async function cachedJson<T>(key: string, ttlMs: number, producer: () => Promise<T>) {
@@ -104,6 +144,9 @@ export function normalizeTargetUrl(input: string, base?: URL) {
   if (!trimmed) throw new PublicTargetError('URL is required');
 
   let candidate = trimmed;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(candidate) && !/^https?:\/\//i.test(candidate)) {
+    throw new PublicTargetError('Only HTTP and HTTPS URLs are supported', 400, 'UNSUPPORTED_PROTOCOL');
+  }
   if (!/^https?:\/\//i.test(candidate)) {
     candidate = base ? new URL(candidate, base).toString() : `https://${candidate}`;
   }
@@ -169,7 +212,7 @@ export async function resolveAndBlockPrivateIp(hostname: string, timeoutMs = TIM
 
   const lookup = dnsPromises.lookup(host, { all: true, verbatim: true });
   const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new PublicTargetError('DNS resolution timed out', 504)), timeoutMs);
+    setTimeout(() => reject(new PublicTargetError('DNS resolution timed out', 504, 'DNS_TIMEOUT', true)), timeoutMs);
   });
   const records = await Promise.race([lookup, timeout]);
   const addresses = records.map((record) => record.address);
@@ -261,7 +304,14 @@ export function consumeRateLimit(request: Request, hostname: string, options: Ra
 
 export function rateLimitResponse(retryAfter: number) {
   return NextResponse.json(
-    { success: false, error: `Rate limit exceeded. Try again in ${retryAfter} seconds.` },
+    {
+      success: false,
+      errorCode: 'RATE_LIMITED',
+      message: `Rate limit exceeded. Try again in ${retryAfter} seconds.`,
+      details: `Retry after ${retryAfter} seconds.`,
+      retryable: true,
+      error: `Rate limit exceeded. Try again in ${retryAfter} seconds.`,
+    },
     { status: 429, headers: { 'Retry-After': String(retryAfter) } }
   );
 }

@@ -3,6 +3,7 @@ import tls from 'tls';
 import {
   assertPublicHostname,
   consumeRateLimit,
+  errorResponse,
   errorMessage,
   jsonError,
   parseJsonBody,
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
   try {
     const body = await parseJsonBody<{ hostname?: unknown }>(request);
     if (typeof body.hostname !== 'string' || !body.hostname.trim()) {
-      return NextResponse.json({ success: false, error: 'Invalid hostname provided' }, { status: 400 });
+      return errorResponse('Invalid hostname provided', 400, 'INVALID_HOSTNAME');
     }
 
     const cleanHost = await assertPublicHostname(body.hostname);

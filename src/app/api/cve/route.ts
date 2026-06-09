@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import {
   cachedJson,
   consumeRateLimit,
+  errorResponse,
   envHeader,
   fetchWithTimeout,
   jsonError,
@@ -121,7 +122,7 @@ export async function POST(request: Request) {
     const query = typeof body.query === 'string' ? body.query.trim() : '';
 
     if (!query || query.length > 120) {
-      return NextResponse.json({ success: false, error: 'Invalid CVE ID or keyword provided' }, { status: 400 });
+      return errorResponse('Invalid CVE ID or keyword provided', 400, 'INVALID_CVE_QUERY');
     }
 
     const rate = consumeRateLimit(request, query.toLowerCase(), {

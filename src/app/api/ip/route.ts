@@ -4,6 +4,7 @@ import {
   assertPublicHostname,
   cachedJson,
   consumeRateLimit,
+  errorResponse,
   envHeader,
   fetchWithTimeout,
   jsonError,
@@ -93,7 +94,7 @@ export async function POST(request: Request) {
   try {
     const body = await parseJsonBody<{ ipOrDomain?: unknown }>(request);
     if (typeof body.ipOrDomain !== 'string' || !body.ipOrDomain.trim()) {
-      return NextResponse.json({ success: false, error: 'Invalid IP or Domain provided' }, { status: 400 });
+      return errorResponse('Invalid IP or Domain provided', 400, 'INVALID_IP_OR_DOMAIN');
     }
 
     const query = normalizeHostname(body.ipOrDomain);
@@ -119,7 +120,14 @@ export async function POST(request: Request) {
 
     if (data.status !== 'success') {
       return NextResponse.json(
-        { success: false, error: data.message || 'Failed to retrieve geolocation data' },
+        {
+          success: false,
+          errorCode: 'GEOLOCATION_LOOKUP_FAILED',
+          message: data.message || 'Failed to retrieve geolocation data',
+          details: data.status,
+          retryable: true,
+          error: data.message || 'Failed to retrieve geolocation data',
+        },
         { status: 502 }
       );
     }

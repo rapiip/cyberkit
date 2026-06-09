@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Command, X, Terminal } from 'lucide-react';
 import { searchTools } from '@/lib/tools/registry';
@@ -39,23 +39,33 @@ export default function CommandPalette() {
 
   const results = searchTools(query).slice(0, 10);
 
+  const closePalette = useCallback(() => {
+    setOpen(false);
+    setQuery('');
+    setSelectedIndex(0);
+  }, []);
+
+  const openPalette = useCallback(() => {
+    setQuery('');
+    setSelectedIndex(0);
+    setOpen(true);
+  }, []);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         if (open) {
-          setOpen(false);
+          closePalette();
         } else {
-          setQuery('');
-          setSelectedIndex(0);
-          setOpen(true);
+          openPalette();
         }
       }
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') closePalette();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [open]);
+  }, [closePalette, open, openPalette]);
 
   useEffect(() => {
     if (open) {
@@ -75,7 +85,7 @@ export default function CommandPalette() {
     }
     if (e.key === 'Enter' && results[selectedIndex]) {
       router.push(`/tools/${results[selectedIndex].slug}`);
-      setOpen(false);
+      closePalette();
     }
   };
 
@@ -87,7 +97,7 @@ export default function CommandPalette() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-black/75 backdrop-blur-md"
-          onClick={() => setOpen(false)}
+          onClick={closePalette}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: -20 }}
@@ -115,7 +125,7 @@ export default function CommandPalette() {
                 <kbd className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-muted text-[10px] text-muted-foreground font-mono border border-border">
                   ESC
                 </kbd>
-                <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors p-1 hover:bg-surface-hover rounded">
+                <button onClick={closePalette} className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors p-1 hover:bg-surface-hover rounded">
                   <X size={16} />
                 </button>
               </div>
@@ -150,7 +160,7 @@ export default function CommandPalette() {
                         }`}
                         onClick={() => {
                           router.push(`/tools/${tool.slug}`);
-                          setOpen(false);
+                          closePalette();
                         }}
                         onMouseEnter={() => setSelectedIndex(i)}
                       >

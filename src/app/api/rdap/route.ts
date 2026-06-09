@@ -3,6 +3,7 @@ import {
   assertPublicHostname,
   cachedJson,
   consumeRateLimit,
+  errorResponse,
   fetchWithTimeout,
   jsonError,
   parseJsonBody,
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
   try {
     const body = await parseJsonBody<{ hostname?: unknown }>(request);
     if (typeof body.hostname !== 'string' || !body.hostname.trim()) {
-      return NextResponse.json({ success: false, error: 'Invalid domain provided' }, { status: 400 });
+      return errorResponse('Invalid domain provided', 400, 'INVALID_DOMAIN');
     }
 
     const domain = await assertPublicHostname(body.hostname);

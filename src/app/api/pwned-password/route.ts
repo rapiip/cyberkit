@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import {
   consumeRateLimit,
+  errorResponse,
   fetchWithTimeout,
   jsonError,
   parseJsonBody,
@@ -19,10 +20,7 @@ export async function POST(request: Request) {
     const password = body.password;
 
     if (typeof password !== 'string' || password.length === 0 || password.length > 1024) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid password provided. Use 1-1024 characters.' },
-        { status: 400 }
-      );
+      return errorResponse('Invalid password provided. Use 1-1024 characters.', 400, 'INVALID_PASSWORD');
     }
 
     const rate = consumeRateLimit(request, 'pwned-password', {
@@ -50,7 +48,14 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { success: false, error: `Pwned Passwords API returned HTTP ${response.status}` },
+        {
+          success: false,
+          errorCode: 'PWNED_PASSWORDS_LOOKUP_FAILED',
+          message: `Pwned Passwords API returned HTTP ${response.status}`,
+          details: `HTTP ${response.status}`,
+          retryable: response.status >= 500 || response.status === 429,
+          error: `Pwned Passwords API returned HTTP ${response.status}`,
+        },
         { status: 502 }
       );
     }

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   consumeRateLimit,
+  errorResponse,
   fetchPublicHttp,
   jsonError,
   normalizeTargetUrl,
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
   try {
     const body = await parseJsonBody<{ url?: unknown }>(request);
     if (typeof body.url !== 'string' || !body.url.trim()) {
-      return NextResponse.json({ success: false, error: 'Invalid URL provided' }, { status: 400 });
+      return errorResponse('Invalid URL provided', 400, 'INVALID_URL');
     }
 
     const targetUrl = normalizeTargetUrl(body.url);
