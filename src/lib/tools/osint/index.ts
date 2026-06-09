@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '../types';
+import { asString } from '../validation';
 
 export const emailFormatTool: ToolDefinition = {
   id: 'email-format', slug: 'email-format', name: 'Email Format Checker', category: 'osint',
@@ -7,7 +8,7 @@ export const emailFormatTool: ToolDefinition = {
   tags: ['email', 'validate', 'format', 'osint'], difficulty: 'beginner', executionType: 'client', isFeatured: false,
   inputs: [{ id: 'email', label: 'Email Address', type: 'text', placeholder: 'user@example.com', required: true }],
   execute: async (inputs) => {
-    const email = (inputs.email as string).trim();
+    const email = asString(inputs.email, 'Email address', 320).trim();
     const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     const valid = regex.test(email);
     const [local, domain] = email.split('@') || ['', ''];
@@ -33,7 +34,7 @@ export const githubSecretTool: ToolDefinition = {
   tags: ['github', 'secret', 'api-key', 'token', 'leak', 'security'], difficulty: 'intermediate', executionType: 'client', isFeatured: false,
   inputs: [{ id: 'input', label: 'Code / Text', type: 'textarea', placeholder: 'Paste code to scan for secrets...', required: true }],
   execute: async (inputs) => {
-    const text = inputs.input as string;
+    const text = asString(inputs.input, 'Code / text', 200_000);
     const patterns: { name: string; regex: RegExp }[] = [
       { name: 'AWS Access Key', regex: /AKIA[0-9A-Z]{16}/g },
       { name: 'AWS Secret Key', regex: /(?:aws_secret|secret_key|secretkey)[\s=:'"]+([A-Za-z0-9/+=]{40})/gi },
@@ -101,7 +102,7 @@ export const cveLookupTool: ToolDefinition = {
     { id: 'startIndex', label: 'Start Index', type: 'number', defaultValue: 0, helperText: 'Use the Next Start Index item to load the next page' },
   ],
   execute: async (inputs) => {
-    const query = (inputs.query as string).trim();
+    const query = asString(inputs.query, 'CVE ID or keyword', 120).trim();
     const severity = (inputs.severity as string) || '';
     const kevOnly = Boolean(inputs.kevOnly);
     const ransomwareOnly = Boolean(inputs.ransomwareOnly);

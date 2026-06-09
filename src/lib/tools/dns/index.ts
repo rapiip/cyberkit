@@ -1,4 +1,5 @@
 import type { ToolDefinition, ToolResultItem } from '../types';
+import { asString, optionalString } from '../validation';
 
 interface MxRecordResult {
   exchange: string;
@@ -36,7 +37,7 @@ export const dnsLookupTool: ToolDefinition = {
     },
   ],
   execute: async (inputs) => {
-    const hostname = (inputs.hostname as string).trim();
+    const hostname = asString(inputs.hostname, 'Domain or IP address', 2048).trim();
     try {
       const response = await fetch('/api/dns', {
         method: 'POST',
@@ -157,8 +158,8 @@ export const dnsOverHttpsTool: ToolDefinition = {
     },
   ],
   execute: async (inputs) => {
-    const hostname = (inputs.hostname as string).trim();
-    const type = (inputs.type as string) || undefined;
+    const hostname = asString(inputs.hostname, 'Domain name', 2048).trim();
+    const type = optionalString(inputs.type) || undefined;
 
     try {
       const response = await fetch('/api/doh', {
@@ -250,7 +251,7 @@ export const whoisLookupTool: ToolDefinition = {
     },
   ],
   execute: async (inputs) => {
-    const hostname = (inputs.hostname as string).trim();
+    const hostname = asString(inputs.hostname, 'Domain name', 2048).trim();
 
     try {
       const response = await fetch('/api/rdap', {

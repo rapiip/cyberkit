@@ -1,4 +1,5 @@
 import type { ToolDefinition } from '../types';
+import { asString, optionalString } from '../validation';
 
 export const cidrCalculatorTool: ToolDefinition = {
   id: 'cidr-calculator',
@@ -15,7 +16,7 @@ export const cidrCalculatorTool: ToolDefinition = {
     { id: 'cidr', label: 'CIDR Block', type: 'text', placeholder: '192.168.1.0/24', required: true },
   ],
   execute: async (inputs) => {
-    const cidr = (inputs.cidr as string).trim();
+    const cidr = asString(inputs.cidr, 'CIDR block', 64).trim();
     const match = cidr.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/);
     if (!match) return { success: false, summary: 'Invalid CIDR format', data: {}, rawOutput: 'Error: Use format like 192.168.1.0/24' };
     const octets = [parseInt(match[1]), parseInt(match[2]), parseInt(match[3]), parseInt(match[4])];
@@ -62,8 +63,8 @@ export const subnetCalculatorTool: ToolDefinition = {
     { id: 'mask', label: 'Subnet Mask or Prefix', type: 'text', placeholder: '255.255.255.0 or /24', required: true },
   ],
   execute: async (inputs) => {
-    const ipStr = (inputs.ip as string).trim();
-    const maskStr = (inputs.mask as string).trim();
+    const ipStr = asString(inputs.ip, 'IP address', 64).trim();
+    const maskStr = asString(inputs.mask, 'Subnet mask or prefix', 64).trim();
     const parseIP = (s: string) => {
       const p = s.split('.').map(Number);
       if (p.length !== 4 || p.some(o => isNaN(o) || o < 0 || o > 255)) return null;
@@ -157,7 +158,7 @@ export const commonPortsTool: ToolDefinition = {
       { port: 8443, service: 'HTTPS Alt', protocol: 'TCP', description: 'HTTPS Alternate' },
       { port: 27017, service: 'MongoDB', protocol: 'TCP', description: 'MongoDB Database' },
     ];
-    const search = (inputs.search as string || '').toLowerCase().trim();
+    const search = optionalString(inputs.search).slice(0, 100).toLowerCase().trim();
     const filtered = search ? ports.filter(p => p.port.toString().includes(search) || p.service.toLowerCase().includes(search) || p.description.toLowerCase().includes(search)) : ports;
     const raw = filtered.map(p => `${p.port}\t${p.service}\t${p.protocol}\t${p.description}`).join('\n');
     return {
@@ -188,7 +189,7 @@ export const ipLookupTool: ToolDefinition = {
     },
   ],
   execute: async (inputs) => {
-    const ipOrDomain = (inputs.ipOrDomain as string).trim();
+    const ipOrDomain = asString(inputs.ipOrDomain, 'IP address or domain', 2048).trim();
     try {
       const response = await fetch('/api/ip', {
         method: 'POST',

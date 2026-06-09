@@ -1,4 +1,5 @@
 import type { ToolDefinition, ToolResultItem } from '../types';
+import { asString } from '../validation';
 
 interface HeaderAnalysisItem {
   name: string;
@@ -110,7 +111,7 @@ export const urlAnalyzerTool: ToolDefinition = {
     { id: 'url', label: 'URL', type: 'url', placeholder: 'https://example.com/path?key=value#section', required: true },
   ],
   execute: async (inputs) => {
-    const urlStr = inputs.url as string;
+    const urlStr = asString(inputs.url, 'URL', 20_000);
     try {
       const url = new URL(urlStr);
       const params: Record<string, string> = {};
@@ -167,6 +168,12 @@ export const cspGeneratorTool: ToolDefinition = {
     { id: 'blockMixed', label: 'Block All Mixed Content', type: 'checkbox', defaultValue: true },
   ],
   execute: async (inputs) => {
+    const sourceInputs = ['defaultSrc', 'scriptSrc', 'styleSrc', 'imgSrc', 'fontSrc', 'connectSrc', 'frameSrc', 'objectSrc'];
+    for (const key of sourceInputs) {
+      if (typeof inputs[key] === 'string' && inputs[key].length > 5000) {
+        return { success: false, summary: `${key} is too long`, data: {}, rawOutput: `Error: ${key} is too long` };
+      }
+    }
     const directives: string[] = [];
     const addDirective = (name: string, value: string | unknown) => {
       const v = (value as string || '').trim();
@@ -203,7 +210,7 @@ export const httpHeaderCheckerTool: ToolDefinition = {
     { id: 'url', label: 'URL or Hostname', type: 'text', placeholder: 'e.g., github.com', required: true },
   ],
   execute: async (inputs) => {
-    const url = (inputs.url as string).trim();
+    const url = asString(inputs.url, 'URL or hostname', 2048).trim();
     try {
       const response = await fetch('/api/headers', {
         method: 'POST',
@@ -272,7 +279,7 @@ export const sslCheckerTool: ToolDefinition = {
     { id: 'hostname', label: 'Hostname or URL', type: 'text', placeholder: 'e.g., google.com', required: true },
   ],
   execute: async (inputs) => {
-    const hostname = (inputs.hostname as string).trim();
+    const hostname = asString(inputs.hostname, 'Hostname', 2048).trim();
     try {
       const response = await fetch('/api/ssl', {
         method: 'POST',
@@ -403,7 +410,7 @@ export const corsCheckerTool: ToolDefinition = {
     { id: 'url', label: 'Target URL', type: 'text', placeholder: 'e.g., https://api.github.com', required: true },
   ],
   execute: async (inputs) => {
-    const url = (inputs.url as string).trim();
+    const url = asString(inputs.url, 'Target URL', 2048).trim();
     try {
       const response = await fetch('/api/cors', {
         method: 'POST',
@@ -484,7 +491,7 @@ export const robotsTxtTool: ToolDefinition = {
     { id: 'url', label: 'Website URL', type: 'text', placeholder: 'e.g., google.com', required: true },
   ],
   execute: async (inputs) => {
-    const url = (inputs.url as string).trim();
+    const url = asString(inputs.url, 'Website URL', 2048).trim();
     try {
       const response = await fetch('/api/robots', {
         method: 'POST',
@@ -540,7 +547,7 @@ export const securityTxtTool: ToolDefinition = {
     { id: 'url', label: 'Domain or URL', type: 'text', placeholder: 'e.g., google.com', required: true },
   ],
   execute: async (inputs) => {
-    const url = (inputs.url as string).trim();
+    const url = asString(inputs.url, 'Domain or URL', 2048).trim();
     try {
       const response = await fetch('/api/security-txt', {
         method: 'POST',
