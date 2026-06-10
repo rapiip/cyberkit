@@ -7,22 +7,7 @@ import { useReportsStore } from '@/lib/store';
 import { exportAuditToPDF } from '@/lib/utils/export';
 import StatePanel from '@/components/ui/StatePanel';
 import type { SavedReport } from '@/lib/tools/types';
-
-function renderMarkdown(content: string) {
-  return content.split(/\r?\n/).map((line, index) => {
-    const trimmed = line.trim();
-    if (!trimmed) return <div key={index} className="h-2" />;
-    const text = trimmed.replace(/\*\*/g, '').replace(/\*/g, '');
-    if (trimmed.startsWith('# ')) return <h2 key={index} className="text-lg font-semibold text-foreground mt-2">{text.replace(/^#\s*/, '')}</h2>;
-    if (trimmed.startsWith('## ')) return <h3 key={index} className="text-sm font-semibold text-cyber-cyan mt-4">{text.replace(/^##\s*/, '')}</h3>;
-    if (trimmed.startsWith('### ')) return <h4 key={index} className="text-xs font-semibold text-foreground mt-3">{text.replace(/^###\s*/, '')}</h4>;
-    if (trimmed === '---') return <hr key={index} className="border-border my-3" />;
-    if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
-      return <p key={index} className="text-xs text-muted-foreground pl-3 leading-relaxed">{text.replace(/^[-*]\s*/, '- ')}</p>;
-    }
-    return <p key={index} className="text-xs text-muted-foreground leading-relaxed">{text}</p>;
-  });
-}
+import { createSavedReportExport } from '@/lib/tools/result-model';
 
 export default function ReportsPage() {
   const { reports, removeReport, clearReports, loadFromStorage } = useReportsStore();
@@ -48,7 +33,7 @@ export default function ReportsPage() {
   };
 
   const handleExport = (report: SavedReport, format: 'markdown' | 'json' = report.format) => {
-    const body = format === 'json' ? JSON.stringify(report, null, 2) : report.content;
+    const body = format === 'json' ? JSON.stringify(createSavedReportExport(report), null, 2) : report.content;
     const blob = new Blob([body], { type: format === 'json' ? 'application/json' : 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -146,9 +131,9 @@ export default function ReportsPage() {
                 <X size={14} />
               </button>
             </div>
-            <div className="p-5 overflow-y-auto space-y-1">
-              {renderMarkdown(selectedReport.content)}
-            </div>
+            <pre className="p-5 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground">
+              {selectedReport.content}
+            </pre>
             <div className="px-5 py-3 border-t border-border flex flex-wrap gap-2 justify-end">
               <button onClick={() => handleCopy(selectedReport.content)} className="btn-cyber btn-secondary btn-sm"><Copy size={12} /> Copy</button>
               <button onClick={() => handleExport(selectedReport, 'markdown')} className="btn-cyber btn-secondary btn-sm"><Download size={12} /> Markdown</button>

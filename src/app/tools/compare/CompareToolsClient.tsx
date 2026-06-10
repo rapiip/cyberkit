@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeftRight, ArrowRight } from 'lucide-react';
-import { getToolsByCategory } from '@/lib/tools/registry';
+import { allToolMetadata } from '@/lib/tools/metadata';
 import StatePanel from '@/components/ui/StatePanel';
-import type { ToolDefinition } from '@/lib/tools/types';
+import type { ToolMetadata } from '@/lib/tools/metadata';
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'An error occurred';
@@ -13,10 +13,9 @@ function getErrorMessage(error: unknown) {
 
 export default function CompareToolsPage() {
   // Combine encoding and hashing tools for comparison dropdowns
-  const compareTools: ToolDefinition[] = [
-    ...getToolsByCategory('encoding'),
-    ...getToolsByCategory('hashing'),
-  ];
+  const compareTools: ToolMetadata[] = allToolMetadata.filter(
+    (tool) => tool.category === 'encoding' || tool.category === 'hashing'
+  );
 
   // Left panel states
   const [leftToolId, setLeftToolId] = useState(compareTools[0]?.id || '');
@@ -44,7 +43,10 @@ export default function CompareToolsPage() {
     setLeftSuccess(false);
 
     try {
-      const result = await leftTool.execute({
+      const { loadToolExecutor } = await import('@/lib/tools/registry');
+      const executor = await loadToolExecutor(leftTool.slug);
+      if (!executor) throw new Error('Tool executor is unavailable.');
+      const result = await executor.execute({
         input: leftInput,
         token: leftInput, // For JWT
         mode: leftMode,
@@ -71,7 +73,10 @@ export default function CompareToolsPage() {
     setRightSuccess(false);
 
     try {
-      const result = await rightTool.execute({
+      const { loadToolExecutor } = await import('@/lib/tools/registry');
+      const executor = await loadToolExecutor(rightTool.slug);
+      if (!executor) throw new Error('Tool executor is unavailable.');
+      const result = await executor.execute({
         input: rightInput,
         token: rightInput,
         mode: rightMode,

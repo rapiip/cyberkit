@@ -1,6 +1,22 @@
 import type { NextConfig } from "next";
+import { legacyRouteMappings } from "./src/lib/tools/workspaces";
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return [
+      { source: "/tools", destination: "/workspaces", permanent: true },
+      {
+        source: "/tools/compare",
+        destination: "/workspaces/data-transformation",
+        permanent: true,
+      },
+      ...legacyRouteMappings.map(({ source, destination }) => ({
+        source,
+        destination,
+        permanent: true,
+      })),
+    ];
+  },
   async headers() {
     const scriptSrc =
       process.env.NODE_ENV === "development"

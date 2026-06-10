@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { allToolMetadata } from '@/lib/tools/metadata';
+import { workspaceRegistry } from '@/lib/tools/workspaces';
 
 const staticRoutes: Array<{
   route: string;
@@ -7,10 +7,9 @@ const staticRoutes: Array<{
   priority: number;
 }> = [
   { route: '', changeFrequency: 'weekly', priority: 1 },
-  { route: '/tools', changeFrequency: 'weekly', priority: 0.95 },
+  { route: '/workspaces', changeFrequency: 'weekly', priority: 0.95 },
   { route: '/audit', changeFrequency: 'weekly', priority: 0.9 },
   { route: '/labs', changeFrequency: 'monthly', priority: 0.8 },
-  { route: '/tools/compare', changeFrequency: 'monthly', priority: 0.75 },
   { route: '/about', changeFrequency: 'yearly', priority: 0.5 },
   { route: '/history', changeFrequency: 'yearly', priority: 0.3 },
   { route: '/reports', changeFrequency: 'yearly', priority: 0.3 },
@@ -32,10 +31,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency,
       priority,
     })),
-    ...allToolMetadata.map((tool) => ({
-      url: `${baseUrl}/tools/${tool.slug}`,
+    ...workspaceRegistry.map((workspace) => ({
+      url: `${baseUrl}${workspace.canonicalPath}`,
       lastModified: now,
-      changeFrequency: 'monthly' as const,
+      changeFrequency: 'weekly' as const,
       priority: 0.85,
     })),
   ];

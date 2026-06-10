@@ -1,5 +1,11 @@
 import { create } from 'zustand';
 import type { ScanHistoryEntry, SavedReport } from '../tools/types';
+import {
+  filterPrivateHistory,
+  filterPrivateReports,
+  isPersistenceRestrictedTool,
+  containsPersistenceRestrictedTool,
+} from '@/lib/security/privacy';
 
 export const STORAGE_KEYS = {
   history: 'cyberkit-history:v1',
@@ -114,16 +120,16 @@ export function validateImportedCyberKitData(value: unknown): CyberKitExportData
 
   return {
     version: 1,
-    history: history.slice(0, 200),
+    history: filterPrivateHistory(history).slice(0, 200),
     favorites: Array.from(new Set(favorites)),
-    reports: reports.slice(0, 100),
+    reports: filterPrivateReports(reports).slice(0, 100),
     exportedAt: typeof value.exportedAt === 'string' ? value.exportedAt : new Date().toISOString(),
   };
 }
 
 export function importCyberKitData(data: CyberKitExportData) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(data.history));
+  localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(filterPrivateHistory(data.history)));
   localStorage.setItem(STORAGE_KEYS.favorites, JSON.stringify(data.favorites));
   localStorage.setItem(STORAGE_KEYS.reports, JSON.stringify(data.reports));
 }
@@ -141,6 +147,7 @@ interface HistoryStore {
 export const useHistoryStore = create<HistoryStore>((set, get) => ({
   entries: [],
   addEntry: (entry) => {
+    if (isPersistenceRestrictedTool(entry.toolId)) return;
     const newEntry: ScanHistoryEntry = {
       ...entry,
       id: crypto.randomUUID(),
@@ -164,7 +171,11 @@ export const useHistoryStore = create<HistoryStore>((set, get) => ({
   },
   loadFromStorage: () => {
     if (typeof window === 'undefined') return;
-    set({ entries: parseArrayFromStorage(STORAGE_KEYS.history, isScanHistoryEntry, STORAGE_KEYS.historyLegacy) });
+    const entries = filterPrivateHistory(
+      parseArrayFromStorage(STORAGE_KEYS.history, isScanHistoryEntry, STORAGE_KEYS.historyLegacy)
+    );
+    localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(entries));
+    set({ entries });
   },
 }));
 
@@ -205,6 +216,7 @@ interface ReportsStore {
 export const useReportsStore = create<ReportsStore>((set, get) => ({
   reports: [],
   addReport: (report) => {
+    if (containsPersistenceRestrictedTool(report.toolsUsed)) return;
     const now = new Date().toISOString();
     const newReport: SavedReport = { ...report, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
     const reports = [newReport, ...get().reports].slice(0, 100);
@@ -225,6 +237,10 @@ export const useReportsStore = create<ReportsStore>((set, get) => ({
   },
   loadFromStorage: () => {
     if (typeof window === 'undefined') return;
-    set({ reports: parseArrayFromStorage(STORAGE_KEYS.reports, isSavedReport, STORAGE_KEYS.reportsLegacy) });
+    const reports = filterPrivateReports(
+      parseArrayFromStorage(STORAGE_KEYS.reports, isSavedReport, STORAGE_KEYS.reportsLegacy)
+    );
+    localStorage.setItem(STORAGE_KEYS.reports, JSON.stringify(reports));
+    set({ reports });
   },
 }));

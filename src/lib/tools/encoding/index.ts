@@ -1,5 +1,6 @@
 import type { ToolDefinition } from '../types';
 import { asString, errorResult, optionalString } from '../validation';
+import { inspectJwt } from '@/lib/security/jwt';
 
 export const base64Tool: ToolDefinition = {
   id: 'base64',
@@ -266,49 +267,77 @@ export const caesarCipherTool: ToolDefinition = {
 export const jwtDecoderTool: ToolDefinition = {
   id: 'jwt-decoder',
   slug: 'jwt-decoder',
-  name: 'JWT Decoder',
+  name: 'JWT Inspector',
   category: 'encoding',
-  description: 'Decode and inspect JSON Web Tokens (JWT). View the header, payload, and signature. Check expiration time and claims. Does not verify signatures.',
-  shortDescription: 'Decode and inspect JWT tokens',
+  description: 'Strictly inspect JWT structure, claims, time boundaries, algorithm risks, and optional HS/RS signatures without treating decoded tokens as verified.',
+  shortDescription: 'Inspect JWT claims and optional signatures',
   tags: ['jwt', 'token', 'decode', 'json', 'auth', 'bearer'],
   difficulty: 'intermediate',
   executionType: 'client',
   isFeatured: true,
+  persistHistory: false,
   inputs: [
     { id: 'token', label: 'JWT Token', type: 'textarea', placeholder: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', required: true },
+    { id: 'clockSkew', label: 'Clock Skew (seconds)', type: 'number', defaultValue: 60, helperText: 'Allowed clock difference (0-3600 seconds)' },
+    { id: 'secret', label: 'Optional HMAC Secret', type: 'password', placeholder: 'Used only for HS256/384/512 verification' },
+    { id: 'publicKey', label: 'Optional RSA Public Key (SPKI PEM)', type: 'textarea', placeholder: '-----BEGIN PUBLIC KEY-----' },
+    { id: 'jwks', label: 'Optional JWKS JSON', type: 'textarea', placeholder: '{"keys":[...]}' },
   ],
   execute: async (inputs) => {
     const token = asString(inputs.token, 'JWT token', 20_000).trim();
     try {
-      const parts = token.split('.');
-      if (parts.length !== 3) throw new Error('Invalid JWT format');
-      if (parts.some((part) => !/^[A-Za-z0-9_-]+$/.test(part))) throw new Error('JWT contains invalid base64url characters');
-      const decode = (s: string) => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
-      const header = decode(parts[0]);
-      const payload = decode(parts[1]);
-      const now = Math.floor(Date.now() / 1000);
-      let expiryInfo = 'No expiration set';
-      if (payload.exp) {
-        const expDate = new Date(payload.exp * 1000);
-        expiryInfo = payload.exp < now ? `EXPIRED at ${expDate.toISOString()}` : `Valid until ${expDate.toISOString()}`;
-      }
-      const raw = JSON.stringify({ header, payload }, null, 2);
+      const inspection = await inspectJwt(token, {
+        clockSkewSeconds: Number(inputs.clockSkew) || 0,
+        secret: typeof inputs.secret === 'string' ? inputs.secret : undefined,
+        publicKeyPem: typeof inputs.publicKey === 'string' ? inputs.publicKey : undefined,
+        jwksJson: typeof inputs.jwks === 'string' ? inputs.jwks : undefined,
+      });
+      const warningSummary = inspection.warnings.length
+        ? `${inspection.warnings.length} warning(s)`
+        : 'no claim or algorithm warnings';
+      const summary = inspection.verification.status === 'verified'
+        ? `Signature verified; ${warningSummary}`
+        : `Decoded; signature ${inspection.verification.status === 'not-requested' ? 'not verified' : inspection.verification.status}; ${warningSummary}`;
+      const raw = JSON.stringify(
+        {
+          header: inspection.header,
+          payload: inspection.payload,
+          claims: inspection.claims,
+          verification: inspection.verification,
+          warnings: inspection.warnings,
+        },
+        null,
+        2
+      );
       return {
         success: true,
-        summary: expiryInfo,
-        data: { header, payload, expiryInfo },
+        summary,
+        data: inspection,
         rawOutput: raw,
-        explanation: `Algorithm: ${header.alg || 'unknown'}\nType: ${header.typ || 'unknown'}\nIssuer: ${payload.iss || 'N/A'}\nSubject: ${payload.sub || 'N/A'}\n${expiryInfo}`,
+        severity: inspection.warnings.some((warning) => warning.severity === 'critical')
+          ? 'critical'
+          : inspection.warnings.some((warning) => warning.severity === 'high')
+            ? 'high'
+            : inspection.warnings.length
+              ? 'medium'
+              : 'info',
+        explanation: 'Decoding proves only that the token structure is readable. Cryptographic authenticity is claimed only when the signature status is verified. Sensitive claim values are masked in output by default.',
         items: [
-          { label: 'Algorithm', value: header.alg || 'unknown', status: 'info' },
-          { label: 'Type', value: header.typ || 'unknown', status: 'info' },
-          { label: 'Expiration', value: expiryInfo, status: payload.exp && payload.exp < now ? 'fail' : 'pass' },
-          { label: 'Issuer', value: payload.iss || 'N/A', status: 'info' },
-          { label: 'Subject', value: payload.sub || 'N/A', status: 'info' },
+          { label: 'Algorithm', value: inspection.algorithm, status: inspection.algorithm === 'none' ? 'fail' : 'info' },
+          { label: 'Signature', value: inspection.verification.message, status: inspection.verification.status === 'verified' ? 'pass' : inspection.verification.status === 'not-requested' ? 'warn' : 'fail' },
+          { label: 'exp', value: inspection.claims.exp !== undefined ? new Date(inspection.claims.exp * 1000).toISOString() : 'Missing', status: inspection.warnings.some((warning) => warning.id === 'expired' || warning.id === 'missing-exp') ? 'fail' : 'pass' },
+          { label: 'nbf', value: inspection.claims.nbf !== undefined ? new Date(inspection.claims.nbf * 1000).toISOString() : 'Not set', status: inspection.warnings.some((warning) => warning.id === 'not-before') ? 'fail' : 'info' },
+          { label: 'iat', value: inspection.claims.iat !== undefined ? new Date(inspection.claims.iat * 1000).toISOString() : 'Not set', status: inspection.warnings.some((warning) => warning.id === 'future-iat') ? 'warn' : 'info' },
+          { label: 'iss', value: inspection.claims.iss || 'Not set', status: 'info' },
+          { label: 'aud', value: Array.isArray(inspection.claims.aud) ? inspection.claims.aud.join(', ') : inspection.claims.aud || 'Not set', status: 'info' },
+          { label: 'sub', value: inspection.claims.sub || 'Not set', status: 'info' },
+          { label: 'jti', value: inspection.claims.jti || 'Not set', status: 'info' },
+          { label: 'Warnings', value: inspection.warnings.map((warning) => warning.message).join(' ') || 'None', status: inspection.warnings.length ? 'warn' : 'pass' },
         ],
       };
-    } catch {
-      return { success: false, summary: 'Invalid JWT token', data: { error: 'Could not decode token' }, rawOutput: 'Error: Invalid JWT format' };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not inspect token.';
+      return { success: false, summary: `Invalid JWT: ${message}`, data: { error: message }, rawOutput: `Error: ${message}` };
     }
   },
 };

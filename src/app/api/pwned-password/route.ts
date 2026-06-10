@@ -11,12 +11,16 @@ import {
 
 export async function POST(request: Request) {
   try {
-    const body = await parseJsonBody<{ hashPrefix?: unknown; hashSuffix?: unknown }>(request);
+    const body = await parseJsonBody<{ hashPrefix?: unknown }>(request);
+    const bodyKeys = Object.keys(body);
     const hashPrefix = typeof body.hashPrefix === 'string' ? body.hashPrefix.trim().toUpperCase() : '';
-    const hashSuffix = typeof body.hashSuffix === 'string' ? body.hashSuffix.trim().toUpperCase() : '';
 
-    if (!/^[A-F0-9]{5}$/.test(hashPrefix) || !/^[A-F0-9]{35}$/.test(hashSuffix)) {
-      return errorResponse('Invalid SHA-1 hash range provided.', 400, 'INVALID_HASH_RANGE');
+    if (bodyKeys.length !== 1 || bodyKeys[0] !== 'hashPrefix' || !/^[A-F0-9]{5}$/.test(hashPrefix)) {
+      return errorResponse(
+        'Request must contain only a five-character SHA-1 prefix.',
+        400,
+        'INVALID_HASH_PREFIX'
+      );
     }
 
     const rate = await consumeRateLimit(request, 'pwned-password', {
@@ -52,20 +56,29 @@ export async function POST(request: Request) {
       );
     }
 
-    const text = await response.text();
-    const line = text
+    const range = (await response.text())
       .split('\n')
       .map((row) => row.trim())
-      .find((row) => row.startsWith(`${hashSuffix}:`));
-    const breachCount = line ? Number(line.split(':')[1]) || 0 : 0;
+      .map((row) => row.match(/^([A-F0-9]{35}):(\d+)$/i))
+      .filter((match): match is RegExpMatchArray => match !== null)
+      .map((match) => ({
+        suffix: match[1].toUpperCase(),
+        count: Number(match[2]),
+      }));
 
-    return NextResponse.json({
-      success: true,
-      provider: 'Have I Been Pwned Pwned Passwords',
-      pwned: breachCount > 0,
-      breachCount,
-      hashPrefix,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        provider: 'Have I Been Pwned Pwned Passwords',
+        hashPrefix,
+        range,
+      },
+      {
+        headers: {
+          'Cache-Control': 'private, no-store',
+        },
+      }
+    );
   } catch (error) {
     return jsonError(error);
   }

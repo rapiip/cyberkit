@@ -2,123 +2,127 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-  LayoutDashboard, Wrench, Shield, FlaskConical, FileText,
-  History, Settings, ChevronLeft, ChevronRight, X, Menu, ArrowLeftRight,
+  BookOpenCheck,
+  Bug,
+  ChevronLeft,
+  ChevronRight,
+  FileScan,
+  FlaskConical,
+  Grid2X2,
+  History,
+  Home,
+  Menu,
+  Radar,
+  ScanSearch,
+  Settings,
+  ShieldCheck,
+  X,
 } from 'lucide-react';
+import {
+  primaryNavigation,
+  secondaryNavigation,
+  type NavigationItem,
+} from '@/lib/navigation';
 
-const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/tools', label: 'All Tools', icon: Wrench },
-  { href: '/tools/compare', label: 'Compare Tools', icon: ArrowLeftRight },
-  { href: '/audit', label: 'Website Audit', icon: Shield },
-  { href: '/labs', label: 'Security Labs', icon: FlaskConical },
-  { href: '/reports', label: 'Reports', icon: FileText },
-  { href: '/history', label: 'History', icon: History },
-  { href: '/settings', label: 'Settings', icon: Settings },
-];
+const iconMap = {
+  home: Home,
+  grid: Grid2X2,
+  shield: ShieldCheck,
+  radar: Radar,
+  file: FileScan,
+  scanner: ScanSearch,
+  cve: Bug,
+  labs: FlaskConical,
+  report: BookOpenCheck,
+  history: History,
+  settings: Settings,
+};
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const openButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    window.setTimeout(() => closeButtonRef.current?.focus(), 0);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileOpen(false);
+        openButtonRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [mobileOpen]);
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
+    if (href === '/workspaces') return pathname === '/workspaces';
     return pathname.startsWith(href);
   };
 
-  const sidebarContent = (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 h-16 border-b border-border shrink-0">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
-          style={{ background: 'linear-gradient(135deg, #00f0ff, #00ff88)' }}>
-          <span style={{ color: '#06080f' }}>CK</span>
-        </div>
-        <AnimatePresence initial={false}>
-          {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: 'auto' }}
-              exit={{ opacity: 0, width: 0 }}
-              transition={{ duration: 0.2 }}
-              className="flex flex-col overflow-hidden whitespace-nowrap"
-            >
-              <span className="text-sm font-bold gradient-text text-glow-cyan">CyberKit</span>
-              <span className="text-[10px] text-muted-foreground">Security Toolkit</span>
-            </motion.div>
+  const renderNavigation = (items: NavigationItem[], isCollapsed: boolean) =>
+    items.map((item) => {
+      const Icon = iconMap[item.icon];
+      const active = isActive(item.href);
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          onClick={() => setMobileOpen(false)}
+          aria-current={active ? 'page' : undefined}
+          title={isCollapsed ? item.label : undefined}
+          className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+            active ? 'text-cyber-cyan' : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
+          }`}
+        >
+          {active && (
+            <motion.span
+              layoutId={isCollapsed ? 'desktopNavIndicator' : undefined}
+              className="absolute inset-0 rounded-lg border-l-[3px] border-cyber-cyan bg-cyber-cyan/10"
+            />
           )}
-        </AnimatePresence>
+          <Icon size={18} className="relative z-10 shrink-0" aria-hidden="true" />
+          {!isCollapsed && <span className="relative z-10 whitespace-nowrap">{item.label}</span>}
+        </Link>
+      );
+    });
+
+  const sidebarContent = (isCollapsed: boolean) => (
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyber-cyan to-cyber-green text-sm font-bold text-[#06080f]">
+          CK
+        </div>
+        {!isCollapsed && (
+          <div className="min-w-0">
+            <span className="block text-sm font-bold gradient-text">CyberKit</span>
+            <span className="block text-[10px] text-muted-foreground">Security Workspaces</span>
+          </div>
+        )}
       </div>
 
-      {/* Nav Items */}
-      <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto scrollbar-thin">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors group relative ${
-                active
-                  ? 'text-cyber-cyan'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
-              }`}
-            >
-              {/* Floating Slide Active Indicator */}
-              {active && (
-                <motion.div
-                  layoutId="activeNavIndicator"
-                  className="absolute inset-0 rounded-lg bg-cyber-cyan/10 border-l-[3px] border-cyber-cyan"
-                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                />
-              )}
-              
-              <Icon 
-                size={18} 
-                className={`relative z-10 transition-transform duration-200 group-hover:scale-110 ${
-                  active ? 'text-cyber-cyan' : 'text-muted-foreground group-hover:text-foreground'
-                }`} 
-              />
-              
-              <AnimatePresence initial={false}>
-                {!collapsed && (
-                  <motion.span
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -10 }}
-                    transition={{ duration: 0.15 }}
-                    className="relative z-10 whitespace-nowrap"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </Link>
-          );
-        })}
+      <nav aria-label="Primary navigation" className="flex-1 space-y-1 overflow-y-auto px-2 py-3 scrollbar-thin">
+        {renderNavigation(primaryNavigation, isCollapsed)}
+        <div className="my-3 border-t border-border" />
+        {!isCollapsed && <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Support</p>}
+        {renderNavigation(secondaryNavigation, isCollapsed)}
       </nav>
 
-      {/* Collapse Toggle (Desktop) */}
-      <div className="hidden md:flex border-t border-border px-2 py-3 shrink-0">
+      <div className="hidden shrink-0 border-t border-border px-2 py-3 md:flex">
         <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="btn-ghost w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs"
+          type="button"
+          onClick={() => setCollapsed((value) => !value)}
+          className="btn-ghost flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          {collapsed ? (
-            <ChevronRight size={16} />
-          ) : (
-            <>
-              <ChevronLeft size={16} />
-              <span>Collapse</span>
-            </>
-          )}
+          {collapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span>Collapse</span></>}
         </button>
       </div>
     </div>
@@ -126,50 +130,67 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile Hamburger */}
       <button
-        className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-lg bg-surface border border-border cursor-pointer hover:border-cyber-cyan/35 transition-all"
+        ref={openButtonRef}
+        type="button"
+        className="fixed left-3 top-3 z-50 rounded-lg border border-border bg-surface p-2 transition-all hover:border-cyber-cyan/35 md:hidden"
         onClick={() => setMobileOpen(true)}
-        aria-label="Open menu"
+        aria-label="Open navigation menu"
+        aria-expanded={mobileOpen}
       >
         <Menu size={20} />
       </button>
 
-      {/* Mobile Overlay */}
-      {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-md" onClick={() => setMobileOpen(false)}>
-          <aside
-            className="w-64 h-full bg-surface border-r border-border flex flex-col"
-            onClick={(e) => e.stopPropagation()}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm md:hidden"
+            onClick={() => setMobileOpen(false)}
           >
-            <button
-              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground cursor-pointer"
-              onClick={() => setMobileOpen(false)}
-              aria-label="Close menu"
+            <motion.aside
+              initial={{ x: -260 }}
+              animate={{ x: 0 }}
+              exit={{ x: -260 }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Mobile navigation"
+              className="h-full w-72 border-r border-border bg-surface"
+              onClick={(event) => event.stopPropagation()}
             >
-              <X size={20} />
-            </button>
-            {sidebarContent}
-          </aside>
-        </div>
-      )}
+              <button
+                ref={closeButtonRef}
+                type="button"
+                className="absolute right-4 top-4 z-10 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setMobileOpen(false);
+                  openButtonRef.current?.focus();
+                }}
+                aria-label="Close navigation menu"
+              >
+                <X size={20} />
+              </button>
+              {sidebarContent(false)}
+            </motion.aside>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Desktop Sidebar (Animated Spring transitions) */}
       <motion.aside
         initial={false}
         animate={{ width: collapsed ? 72 : 260 }}
         transition={{ type: 'spring', stiffness: 220, damping: 26 }}
-        className="hidden md:flex flex-col fixed left-0 top-0 h-screen bg-surface border-r border-border z-30"
+        className="fixed left-0 top-0 z-30 hidden h-screen flex-col border-r border-border bg-surface md:flex"
       >
-        {sidebarContent}
+        {sidebarContent(collapsed)}
       </motion.aside>
-
-      {/* Spacer matching sidebar size dynamically */}
-      <motion.div 
+      <motion.div
         initial={false}
         animate={{ width: collapsed ? 72 : 260 }}
         transition={{ type: 'spring', stiffness: 220, damping: 26 }}
-        className="hidden md:block shrink-0" 
+        className="hidden shrink-0 md:block"
       />
     </>
   );

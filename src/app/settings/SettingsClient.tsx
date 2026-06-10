@@ -10,11 +10,17 @@ import {
   useReportsStore,
   validateImportedCyberKitData,
 } from '@/lib/store';
+import {
+  decryptSyncData,
+  encryptSyncData,
+  type EncryptedSyncEnvelope,
+} from '@/lib/security/cloud-sync';
 
 const LAST_SYNCED_STORAGE_KEY = 'cyberkit:lastSyncedAt';
 
 export default function SettingsPage() {
-  const [syncKey, setSyncKey] = useState('');
+  const [syncId, setSyncId] = useState('');
+  const [syncPassphrase, setSyncPassphrase] = useState('');
   const [syncStatus, setSyncStatus] = useState('');
   const [syncAction, setSyncAction] = useState<'push' | 'pull' | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(() =>
@@ -85,16 +91,18 @@ export default function SettingsPage() {
     setSyncAction('push');
     setSyncStatus('');
     try {
+      const envelope = await encryptSyncData(buildExportData(), syncPassphrase);
       const response = await fetch('/api/sync', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ syncKey, data: buildExportData() }),
+        body: JSON.stringify({ syncId, envelope }),
       });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || data.error || 'Cloud sync failed');
       const syncedAt = typeof data.syncedAt === 'string' ? data.syncedAt : new Date().toISOString();
       rememberLastSyncedAt(syncedAt);
-      setSyncStatus(`Synced at ${new Date(syncedAt).toLocaleString()}`);
+      const expiry = typeof data.expiresAt === 'string' ? `; expires ${new Date(data.expiresAt).toLocaleString()}` : '';
+      setSyncStatus(`Encrypted backup synced at ${new Date(syncedAt).toLocaleString()}${expiry}`);
     } catch (error) {
       setSyncStatus(error instanceof Error ? error.message : 'Cloud sync failed');
     } finally {
@@ -109,12 +117,16 @@ export default function SettingsPage() {
       const response = await fetch('/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ syncKey }),
+        body: JSON.stringify({ syncId }),
       });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || data.error || 'Cloud restore failed');
-      if (!data.found || !data.data) throw new Error('No cloud data found for this sync key');
-      importCyberKitData(validateImportedCyberKitData(data.data));
+      if (!data.found || !data.envelope) throw new Error('No cloud data found for this Sync ID');
+      const decrypted = await decryptSyncData<unknown>(
+        data.envelope as EncryptedSyncEnvelope,
+        syncPassphrase
+      );
+      importCyberKitData(validateImportedCyberKitData(decrypted));
       rememberLastSyncedAt(new Date().toISOString());
       window.location.reload();
     } catch (error) {
@@ -162,19 +174,40 @@ export default function SettingsPage() {
       {/* Cloud Sync */}
       <div className="glass-card p-5 space-y-4">
         <h2 className="font-semibold text-sm flex items-center gap-2"><Cloud size={14} /> Cloud Sync</h2>
+        <label className="block text-xs text-muted-foreground" htmlFor="cloud-sync-id">Sync ID</label>
         <input
-          value={syncKey}
-          onChange={(event) => setSyncKey(event.target.value)}
+          id="cloud-sync-id"
+          value={syncId}
+          onChange={(event) => setSyncId(event.target.value)}
+          className="input-cyber text-sm"
+          type="text"
+          placeholder="team-device-backup"
+          minLength={8}
+          maxLength={128}
+          autoComplete="off"
+        />
+        <label className="block text-xs text-muted-foreground" htmlFor="cloud-sync-passphrase">Encryption passphrase</label>
+        <input
+          id="cloud-sync-passphrase"
+          value={syncPassphrase}
+          onChange={(event) => setSyncPassphrase(event.target.value)}
           className="input-cyber text-sm"
           type="password"
-          placeholder="Sync key"
+          placeholder="At least 16 characters"
           minLength={16}
-          maxLength={128}
+          maxLength={256}
+          autoComplete="new-password"
         />
+        <div className="rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/5 p-3 text-xs leading-5 text-muted-foreground">
+          Your browser encrypts exports with AES-256-GCM. The key is derived locally with
+          PBKDF2-SHA-256 and a random salt. The server receives only the Sync ID plus
+          ciphertext, IV, salt, format version, and timestamp. The passphrase and plaintext
+          are never sent or stored. Backups expire automatically.
+        </div>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={pushCloudSync}
-            disabled={syncing || syncKey.trim().length < 16}
+            disabled={syncing || syncId.trim().length < 8 || syncPassphrase.length < 16}
             className="btn-cyber btn-secondary flex-1 disabled:opacity-50"
           >
             {syncAction === 'push' ? (
@@ -186,7 +219,7 @@ export default function SettingsPage() {
           </button>
           <button
             onClick={pullCloudSync}
-            disabled={syncing || syncKey.trim().length < 16}
+            disabled={syncing || syncId.trim().length < 8 || syncPassphrase.length < 16}
             className="btn-cyber btn-secondary flex-1 disabled:opacity-50"
           >
             {syncAction === 'pull' ? (
@@ -220,7 +253,9 @@ export default function SettingsPage() {
       </div>
 
       <div className="text-center text-xs text-muted-foreground py-4">
-        History, favorites, and saved reports are stored locally in your browser. Scanner tools may send the target domain, URL, IP, DNS query, CVE keyword, or password hash prefix to CyberKit backend routes and relevant external APIs such as DNS/RDAP, SSL, NVD/CISA, HIBP, or optional threat-intel providers.
+        History, favorites, and saved reports are stored locally in your browser. Password and JWT
+        panels never write inputs or results to history, reports, analytics, or localStorage. Pwned
+        Password sends only a five-character SHA-1 prefix. Cloud Sync sends only encrypted data.
       </div>
     </div>
   );

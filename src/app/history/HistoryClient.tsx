@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { History, Trash2, ExternalLink, Clock } from 'lucide-react';
 import { useHistoryStore } from '@/lib/store';
 import Link from 'next/link';
-import { allTools } from '@/lib/tools/registry';
+import { allToolMetadata } from '@/lib/tools/metadata';
 import StatePanel from '@/components/ui/StatePanel';
 
 export default function HistoryPage() {
@@ -35,7 +35,7 @@ export default function HistoryPage() {
       ) : (
         <div className="space-y-2">
           {entries.map((entry, i) => {
-            const tool = allTools.find(t => t.id === entry.toolId);
+            const tool = allToolMetadata.find(t => t.id === entry.toolId);
             return (
               <motion.div
                 key={entry.id}

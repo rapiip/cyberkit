@@ -1,8 +1,35 @@
-import type { ToolDefinition } from './types';
+import type {
+  PrivacyLevel,
+  ToolDefinition,
+  ToolMaturity,
+  ToolProvider,
+  ToolTestCoverage,
+} from './types';
+import {
+  getWorkspaceForTool,
+  toolWorkspaceAssignments,
+  type WorkspaceId,
+} from './workspaces';
 
-export type ToolMetadata = Omit<ToolDefinition, 'execute'>;
+type BaseToolMetadata = Omit<ToolDefinition, 'execute'>;
 
-export const allToolMetadata = [
+export interface ToolMetadata extends BaseToolMetadata {
+  workspaceId: WorkspaceId;
+  capabilities: string[];
+  maturity: ToolMaturity;
+  privacyLevel: PrivacyLevel;
+  providers: ToolProvider[];
+  expectedInputs: Array<{
+    id: string;
+    label: string;
+    type: string;
+    required: boolean;
+  }>;
+  limitations: string[];
+  testCoverage: ToolTestCoverage;
+}
+
+const rawToolMetadata = [
   {
     "id": "url-analyzer",
     "slug": "url-analyzer",
@@ -869,10 +896,10 @@ export const allToolMetadata = [
   {
     "id": "jwt-decoder",
     "slug": "jwt-decoder",
-    "name": "JWT Decoder",
+    "name": "JWT Inspector",
     "category": "encoding",
-    "description": "Decode and inspect JSON Web Tokens (JWT). View the header, payload, and signature. Check expiration time and claims. Does not verify signatures.",
-    "shortDescription": "Decode and inspect JWT tokens",
+    "description": "Strictly inspect JWT structure, claims, time boundaries, algorithm risks, and optional HS/RS signatures without treating decoded tokens as verified.",
+    "shortDescription": "Inspect JWT claims and optional signatures",
     "tags": [
       "jwt",
       "token",
@@ -884,6 +911,7 @@ export const allToolMetadata = [
     "difficulty": "intermediate",
     "executionType": "client",
     "isFeatured": true,
+    "persistHistory": false,
     "inputs": [
       {
         "id": "token",
@@ -891,6 +919,31 @@ export const allToolMetadata = [
         "type": "textarea",
         "placeholder": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
         "required": true
+      },
+      {
+        "id": "clockSkew",
+        "label": "Clock Skew (seconds)",
+        "type": "number",
+        "defaultValue": 60,
+        "helperText": "Allowed clock difference (0-3600 seconds)"
+      },
+      {
+        "id": "secret",
+        "label": "Optional HMAC Secret",
+        "type": "password",
+        "placeholder": "Used only for HS256/384/512 verification"
+      },
+      {
+        "id": "publicKey",
+        "label": "Optional RSA Public Key (SPKI PEM)",
+        "type": "textarea",
+        "placeholder": "-----BEGIN PUBLIC KEY-----"
+      },
+      {
+        "id": "jwks",
+        "label": "Optional JWKS JSON",
+        "type": "textarea",
+        "placeholder": "{\"keys\":[...]}"
       }
     ]
   },
@@ -1137,10 +1190,11 @@ export const allToolMetadata = [
     "slug": "password-generator",
     "name": "Password Generator",
     "category": "hashing",
-    "description": "Generate cryptographically secure random passwords with customizable length and character sets.",
-    "shortDescription": "Generate secure random passwords",
+    "description": "Generate cryptographically secure passwords or multi-word passphrases without modulo bias.",
+    "shortDescription": "Generate secure passwords and passphrases",
     "tags": [
       "password",
+      "passphrase",
       "random",
       "secure",
       "generator"
@@ -1148,7 +1202,24 @@ export const allToolMetadata = [
     "difficulty": "beginner",
     "executionType": "client",
     "isFeatured": true,
+    "persistHistory": false,
     "inputs": [
+      {
+        "id": "mode",
+        "label": "Generator Mode",
+        "type": "select",
+        "defaultValue": "password",
+        "options": [
+          {
+            "label": "Random Password",
+            "value": "password"
+          },
+          {
+            "label": "Passphrase",
+            "value": "passphrase"
+          }
+        ]
+      },
       {
         "id": "length",
         "label": "Length",
@@ -1186,6 +1257,49 @@ export const allToolMetadata = [
         "label": "Include Symbols (!@#$...)",
         "type": "checkbox",
         "defaultValue": true
+      },
+      {
+        "id": "wordCount",
+        "label": "Passphrase Word Count",
+        "type": "number",
+        "defaultValue": 5,
+        "helperText": "Passphrase words (4-12)"
+      },
+      {
+        "id": "separator",
+        "label": "Passphrase Separator",
+        "type": "select",
+        "defaultValue": "-",
+        "options": [
+          {
+            "label": "Hyphen (-)",
+            "value": "-"
+          },
+          {
+            "label": "Space",
+            "value": " "
+          },
+          {
+            "label": "Period (.)",
+            "value": "."
+          },
+          {
+            "label": "Underscore (_)",
+            "value": "_"
+          }
+        ]
+      },
+      {
+        "id": "capitalizeWords",
+        "label": "Capitalize Passphrase Words",
+        "type": "checkbox",
+        "defaultValue": false
+      },
+      {
+        "id": "includePassphraseNumber",
+        "label": "Include Random Number",
+        "type": "checkbox",
+        "defaultValue": true
       }
     ]
   },
@@ -1194,8 +1308,8 @@ export const allToolMetadata = [
     "slug": "password-strength",
     "name": "Password Strength Checker",
     "category": "hashing",
-    "description": "Analyze password strength based on length, character diversity, patterns, and entropy. Provides a security score and recommendations.",
-    "shortDescription": "Check password strength and entropy",
+    "description": "Estimate password resistance with zxcvbn-ts, pattern feedback, crack-time estimates, and optional HIBP breach status.",
+    "shortDescription": "Estimate password strength and breach status",
     "tags": [
       "password",
       "strength",
@@ -1206,13 +1320,21 @@ export const allToolMetadata = [
     "difficulty": "beginner",
     "executionType": "client",
     "isFeatured": false,
+    "persistHistory": false,
     "inputs": [
       {
         "id": "password",
         "label": "Password",
-        "type": "text",
+        "type": "password",
         "placeholder": "Enter password to analyze...",
         "required": true
+      },
+      {
+        "id": "checkBreach",
+        "label": "Check HIBP breach status using prefix-only k-anonymity",
+        "type": "checkbox",
+        "defaultValue": false,
+        "helperText": "Optional. Only the first five SHA-1 characters leave the browser."
       }
     ]
   },
@@ -1234,14 +1356,15 @@ export const allToolMetadata = [
     "difficulty": "beginner",
     "executionType": "server",
     "isFeatured": true,
+    "persistHistory": false,
     "inputs": [
       {
         "id": "password",
         "label": "Password",
-        "type": "text",
+        "type": "password",
         "placeholder": "Enter password to check...",
         "required": true,
-        "helperText": "The password is SHA-1 hashed in your browser. Only the hash prefix and suffix are sent to CyberKit."
+        "helperText": "The password is SHA-1 hashed locally. Only the first five hash characters are sent; suffix matching stays in this browser."
       }
     ]
   },
@@ -1741,7 +1864,113 @@ export const allToolMetadata = [
       }
     ]
   }
-] satisfies ToolMetadata[];
+] satisfies BaseToolMetadata[];
+
+const browserProvider: ToolProvider = {
+  id: 'browser',
+  name: 'Browser Web APIs',
+  kind: 'browser',
+  optional: false,
+};
+
+const cyberkitProvider: ToolProvider = {
+  id: 'cyberkit',
+  name: 'CyberKit server route',
+  kind: 'cyberkit',
+  optional: false,
+};
+
+const providerOverrides: Partial<Record<string, ToolProvider[]>> = {
+  'dns-lookup': [
+    cyberkitProvider,
+    { id: 'system-dns', name: 'Deployment DNS resolver', kind: 'public-api', optional: false },
+  ],
+  'dns-over-https': [
+    cyberkitProvider,
+    { id: 'google-doh', name: 'Google Public DNS', kind: 'public-api', optional: false },
+    { id: 'securitytrails', name: 'SecurityTrails', kind: 'optional-api', optional: true },
+  ],
+  'whois-lookup': [
+    cyberkitProvider,
+    { id: 'iana-rdap', name: 'IANA RDAP bootstrap', kind: 'public-api', optional: false },
+    { id: 'rdap-org', name: 'RDAP.org', kind: 'public-api', optional: false },
+  ],
+  'ip-lookup': [
+    cyberkitProvider,
+    { id: 'ip-api', name: 'IP-API', kind: 'public-api', optional: false },
+    { id: 'abuseipdb', name: 'AbuseIPDB', kind: 'optional-api', optional: true },
+    { id: 'shodan', name: 'Shodan', kind: 'optional-api', optional: true },
+    { id: 'virustotal', name: 'VirusTotal', kind: 'optional-api', optional: true },
+    { id: 'urlhaus', name: 'URLhaus', kind: 'optional-api', optional: true },
+  ],
+  'pwned-password': [
+    cyberkitProvider,
+    { id: 'hibp-pwned-passwords', name: 'Have I Been Pwned Pwned Passwords', kind: 'public-api', optional: false },
+  ],
+  'cve-lookup': [
+    cyberkitProvider,
+    { id: 'nvd', name: 'NIST NVD', kind: 'public-api', optional: false },
+    { id: 'cisa-kev', name: 'CISA KEV', kind: 'public-api', optional: false },
+  ],
+};
+
+const limitationOverrides: Partial<Record<string, string[]>> = {
+  'hash-identifier': ['Results are format-based candidates, not proof of the originating algorithm.'],
+  'ip-lookup': ['IP geolocation is approximate and must not be treated as a precise physical location.'],
+  'exif-viewer': ['The current parser reads a limited EXIF subset and does not cover all IPTC/XMP metadata.'],
+  'pwned-password': ['Requires network access to the HIBP range service.'],
+  'jwt-decoder': ['Signature verification supports HS256/384/512 and RS256/384/512 with a local secret, SPKI public key, or pasted JWKS. Decoding alone never proves authenticity.'],
+  'github-secret': ['Pattern matching can produce false positives and false negatives.'],
+};
+
+function privacyLevelFor(tool: BaseToolMetadata): PrivacyLevel {
+  if (['password-generator', 'password-strength', 'jwt-decoder', 'github-secret', 'file-hash'].includes(tool.id)) {
+    return 'sensitive-local';
+  }
+  if (tool.executionType === 'client') return 'local';
+  if (providerOverrides[tool.id]?.some((provider) => provider.kind.endsWith('api'))) return 'external-provider';
+  return 'server-proxied';
+}
+
+function coverageFor(toolId: string): ToolTestCoverage {
+  if (toolId === 'pwned-password') {
+    return { status: 'e2e', unit: true, route: true, fixtures: true, e2e: true };
+  }
+  if (['password-generator', 'password-strength', 'jwt-decoder'].includes(toolId)) {
+    return { status: 'integration', unit: true, route: false, fixtures: true, e2e: false };
+  }
+  if (toolId === 'dns-lookup') {
+    return { status: 'partial', unit: false, route: true, fixtures: false, e2e: false };
+  }
+  return { status: 'none', unit: false, route: false, fixtures: false, e2e: false };
+}
+
+export const allToolMetadata: ToolMetadata[] = rawToolMetadata.map((tool) => {
+  const workspaceId = toolWorkspaceAssignments[tool.id as keyof typeof toolWorkspaceAssignments];
+  const workspace = getWorkspaceForTool(tool.id);
+  if (!workspaceId || !workspace) throw new Error(`Tool ${tool.id} is not assigned to a workspace.`);
+
+  return {
+    ...tool,
+    workspaceId,
+    capabilities: Array.from(new Set([workspaceId, tool.executionType, ...tool.tags])),
+    maturity: workspace.maturity,
+    privacyLevel: privacyLevelFor(tool),
+    providers: providerOverrides[tool.id] ?? (tool.executionType === 'client' ? [browserProvider] : [cyberkitProvider]),
+    expectedInputs: tool.inputs.map((input) => ({
+      id: input.id,
+      label: input.label,
+      type: input.type,
+      required: 'required' in input && input.required === true,
+    })),
+    limitations: limitationOverrides[tool.id] ?? [
+      tool.executionType === 'client'
+        ? 'Runs in the current browser and is limited by browser APIs and available memory.'
+        : 'Availability and completeness depend on the target and upstream provider.',
+    ],
+    testCoverage: coverageFor(tool.id),
+  };
+});
 
 export function getToolMetadataBySlug(slug: string): ToolMetadata | undefined {
   return allToolMetadata.find((tool) => tool.slug === slug);

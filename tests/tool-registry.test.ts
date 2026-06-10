@@ -1,14 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { allTools } from '../src/lib/tools/registry';
+import {
+  getLoadedExecutorWorkspaces,
+  loadToolExecutor,
+  validateRegistrySync,
+} from '../src/lib/tools/registry';
 import { allToolMetadata } from '../src/lib/tools/metadata';
 import { pwnedPasswordTool } from '../src/lib/tools/hashing';
+import { sha1RangeParts } from '../src/lib/security/password';
+
+test('metadata import does not eagerly invoke workspace executor loaders', () => {
+  assert.deepEqual(getLoadedExecutorWorkspaces(), []);
+});
+
+test('tool executor loads only its owning workspace on demand', async () => {
+  const tool = await loadToolExecutor('base64');
+  assert.ok(tool);
+  assert.equal(tool.slug, 'base64');
+  assert.deepEqual(getLoadedExecutorWorkspaces(), ['data-transformation']);
+});
 
 test('tool registry has unique ids and slugs', () => {
   const ids = new Set<string>();
   const slugs = new Set<string>();
 
-  for (const tool of allTools) {
+  for (const tool of allToolMetadata) {
     assert.equal(ids.has(tool.id), false, `Duplicate tool id: ${tool.id}`);
     assert.equal(slugs.has(tool.slug), false, `Duplicate tool slug: ${tool.slug}`);
     ids.add(tool.id);
@@ -17,7 +33,7 @@ test('tool registry has unique ids and slugs', () => {
 });
 
 test('tool inputs have valid defaults and option values', () => {
-  for (const tool of allTools) {
+  for (const tool of allToolMetadata) {
     const inputIds = new Set<string>();
     for (const input of tool.inputs) {
       assert.equal(inputIds.has(input.id), false, `Duplicate input id ${input.id} in ${tool.id}`);
@@ -38,31 +54,34 @@ test('tool inputs have valid defaults and option values', () => {
   }
 });
 
-test('tool metadata stays in sync with executable registry', () => {
-  assert.deepEqual(
-    allToolMetadata.map((tool) => tool.slug).sort(),
-    allTools.map((tool) => tool.slug).sort()
-  );
+test('tool metadata includes architecture and privacy fields', () => {
   for (const metadata of allToolMetadata) {
-    const tool = allTools.find((item) => item.slug === metadata.slug);
-    assert.ok(tool, `Missing executable tool for ${metadata.slug}`);
-    assert.equal(metadata.name, tool.name);
-    assert.equal(metadata.category, tool.category);
-    assert.deepEqual(metadata.inputs, tool.inputs);
+    assert.ok(metadata.workspaceId);
+    assert.ok(metadata.capabilities.length > 0);
+    assert.ok(['core', 'utility', 'experimental'].includes(metadata.maturity));
+    assert.ok(['local', 'sensitive-local', 'server-proxied', 'external-provider'].includes(metadata.privacyLevel));
+    assert.ok(metadata.providers.length > 0);
+    assert.equal(metadata.expectedInputs.length, metadata.inputs.length);
+    assert.ok(metadata.limitations.length > 0);
+    assert.ok(metadata.testCoverage.status);
   }
 });
 
-test('pwned password tool sends only hash range data to backend', async () => {
+test('tool metadata stays in sync with lazy executors', async () => {
+  await validateRegistrySync();
+});
+
+test('pwned password tool sends only the five-character hash prefix', async () => {
   const originalFetch = globalThis.fetch;
   let body = '';
+  const { suffix } = await sha1RangeParts('password');
   globalThis.fetch = async (_input, init) => {
     body = String(init?.body || '');
     return Response.json({
       success: true,
       provider: 'test',
-      pwned: false,
-      breachCount: 0,
       hashPrefix: '5BAA6',
+      range: [{ suffix, count: 42 }],
     });
   };
 
@@ -70,9 +89,10 @@ test('pwned password tool sends only hash range data to backend', async () => {
     const result = await pwnedPasswordTool.execute({ password: 'password' });
     assert.equal(result.success, true);
     assert.equal(body.includes('password'), false);
-    const payload = JSON.parse(body) as { hashPrefix: string; hashSuffix: string };
+    const payload = JSON.parse(body) as { hashPrefix: string };
+    assert.deepEqual(Object.keys(payload), ['hashPrefix']);
     assert.equal(payload.hashPrefix, '5BAA6');
-    assert.equal(payload.hashSuffix.length, 35);
+    assert.equal(result.data.breachCount, 42);
   } finally {
     globalThis.fetch = originalFetch;
   }

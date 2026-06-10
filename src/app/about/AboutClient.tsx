@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Shield, ExternalLink, Globe, Code, Wrench, FlaskConical, FileText } from 'lucide-react';
-import { allTools } from '@/lib/tools/registry';
+import { allToolMetadata } from '@/lib/tools/metadata';
 import { categories } from '@/lib/tools/categories';
 import Link from 'next/link';
 
@@ -33,7 +33,7 @@ export default function AboutPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { icon: <Wrench size={20} />, value: allTools.length, label: 'Tools' },
+          { icon: <Wrench size={20} />, value: allToolMetadata.length, label: 'Tools' },
           { icon: <Shield size={20} />, value: categories.length, label: 'Categories' },
           { icon: <FlaskConical size={20} />, value: 2, label: 'Labs' },
           { icon: <FileText size={20} />, value: '∞', label: 'Reports' },

@@ -1,0 +1,227 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+import Link from 'next/link';
+import {
+  ArrowRight,
+  Binary,
+  FileScan,
+  Hash,
+  KeyRound,
+  LockKeyhole,
+  Network,
+  Puzzle,
+  Radar,
+  ScanSearch,
+  ShieldAlert,
+  ShieldCheck,
+  Workflow,
+} from 'lucide-react';
+import ToolRunner from '@/components/workspaces/ToolRunner';
+import StatePanel from '@/components/ui/StatePanel';
+import type { ToolMetadata } from '@/lib/tools/metadata';
+import type { WorkspaceDefinition } from '@/lib/tools/workspaces';
+
+const iconMap = {
+  ShieldCheck,
+  Radar,
+  Network,
+  Workflow,
+  KeyRound,
+  Puzzle,
+  Hash,
+  LockKeyhole,
+  FileScan,
+  ScanSearch,
+  ShieldAlert,
+  Binary,
+} as const;
+
+interface WorkspaceClientProps {
+  workspace: WorkspaceDefinition;
+  tools: ToolMetadata[];
+  initialToolId?: string;
+}
+
+export default function WorkspaceClient({
+  workspace,
+  tools,
+  initialToolId,
+}: WorkspaceClientProps) {
+  const initialTool =
+    tools.find((tool) => tool.id === initialToolId) ??
+    tools.find((tool) => workspace.primaryToolIds.includes(tool.id)) ??
+    tools[0];
+  const [activeToolId, setActiveToolId] = useState(initialTool?.id ?? '');
+  const activeTool = tools.find((tool) => tool.id === activeToolId);
+  const Icon = iconMap[workspace.icon as keyof typeof iconMap] ?? Workflow;
+
+  const primaryTools = useMemo(
+    () => workspace.primaryToolIds
+      .map((toolId) => tools.find((tool) => tool.id === toolId))
+      .filter((tool): tool is ToolMetadata => tool !== undefined),
+    [tools, workspace.primaryToolIds]
+  );
+
+  const selectTool = (toolId: string) => {
+    setActiveToolId(toolId);
+    window.history.replaceState(null, '', `${workspace.canonicalPath}?tool=${encodeURIComponent(toolId)}`);
+  };
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6 p-4 pt-20 md:p-8">
+      <header className="glass-card relative overflow-hidden p-6 md:p-8">
+        <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-cyber-cyan/10 to-transparent" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-cyber-cyan/20 bg-cyber-cyan/10 text-cyber-cyan">
+              <Icon size={24} />
+            </div>
+            <div>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className={`badge ${
+                  workspace.maturity === 'core'
+                    ? 'badge-green'
+                    : workspace.maturity === 'utility'
+                      ? 'badge-cyan'
+                      : 'badge-purple'
+                }`}>
+                  {workspace.maturity}
+                </span>
+                {workspace.priority && <span className="badge badge-amber">Priority workflow</span>}
+              </div>
+              <h1 className="text-2xl font-bold md:text-3xl">{workspace.name}</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                {workspace.description}
+              </p>
+            </div>
+          </div>
+
+          {workspace.primaryAction && (
+            <Link
+              href={workspace.primaryAction.href}
+              className="btn-cyber btn-primary shrink-0 self-start"
+            >
+              {workspace.primaryAction.label} <ArrowRight size={15} />
+            </Link>
+          )}
+        </div>
+        {workspace.primaryAction && (
+          <p className="relative mt-4 max-w-3xl text-xs text-muted-foreground">
+            {workspace.primaryAction.description}
+          </p>
+        )}
+      </header>
+
+      {(workspace.id === 'password-security' || workspace.id === 'jwt-inspector') && (
+        <aside className="rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/5 p-4 text-sm text-muted-foreground">
+          {workspace.id === 'password-security'
+            ? 'Password inputs and generated values remain in browser memory and are excluded from history, reports, analytics, localStorage, exports, and Cloud Sync. Optional HIBP checks send only a five-character SHA-1 prefix; suffix matching happens locally.'
+            : 'JWT tokens, verification secrets, public keys, and JWKS material are processed locally and excluded from history, reports, analytics, localStorage, exports, and Cloud Sync. Decoding alone never establishes authenticity.'}
+        </aside>
+      )}
+
+      {tools.length === 0 ? (
+        <StatePanel
+          icon={<Workflow size={24} />}
+          title="No capability panels available"
+          description="This workspace is registered, but no executable capability is currently assigned."
+          action={<Link href="/workspaces" className="text-sm text-cyber-cyan">Back to workspaces</Link>}
+        />
+      ) : (
+        <>
+          <section className="glass-card p-4" aria-labelledby="capability-panels-heading">
+            <div className="mb-3">
+              <h2 id="capability-panels-heading" className="text-sm font-semibold">
+                Capability panels
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Switch panels without loading executor code until you run the selected capability.
+              </p>
+            </div>
+
+            {primaryTools.length > 0 && (
+              <div className="mb-4">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Workflow
+                </p>
+                <div className="flex flex-wrap gap-2" role="tablist" aria-label={`${workspace.name} workflow panels`}>
+                  {primaryTools.map((tool) => (
+                    <button
+                      key={tool.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeToolId === tool.id}
+                      onClick={() => selectTool(tool.id)}
+                      className={`tab-item border ${
+                        activeToolId === tool.id
+                          ? 'active border-cyber-cyan/30'
+                          : 'border-transparent bg-surface'
+                      }`}
+                    >
+                      {tool.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {workspace.utilityGroups.map((group) => {
+              const groupTools = group.toolIds
+                .map((toolId) => tools.find((tool) => tool.id === toolId))
+                .filter((tool): tool is ToolMetadata => tool !== undefined);
+              if (!groupTools.length) return null;
+              return (
+                <div key={group.id} className="border-t border-border py-4 last:pb-0">
+                  <p className="text-xs font-semibold text-foreground">{group.name}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{group.description}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" role="tablist" aria-label={group.name}>
+                    {groupTools.map((tool) => (
+                      <button
+                        key={tool.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeToolId === tool.id}
+                        onClick={() => selectTool(tool.id)}
+                        className={`tab-item border ${
+                          activeToolId === tool.id
+                            ? 'active border-cyber-cyan/30'
+                            : 'border-transparent bg-surface'
+                        }`}
+                      >
+                        {tool.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+
+          {activeTool ? (
+            <section aria-labelledby="active-panel-heading">
+              <div className="mb-4">
+                <h2 id="active-panel-heading" className="text-xl font-semibold">
+                  {activeTool.name}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">{activeTool.description}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="badge badge-cyan">{activeTool.privacyLevel}</span>
+                  <span className="badge badge-purple">{activeTool.executionType}-side</span>
+                  <span className="badge badge-green">{activeTool.testCoverage.status} tests</span>
+                </div>
+              </div>
+              <ToolRunner key={activeTool.id} tool={activeTool} />
+            </section>
+          ) : (
+            <StatePanel
+              icon={<Workflow size={24} />}
+              title="Select a capability panel"
+              description="Choose a workflow or utility panel above to begin."
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+}

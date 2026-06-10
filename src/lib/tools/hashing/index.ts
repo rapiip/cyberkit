@@ -1,5 +1,11 @@
 import type { ToolDefinition } from '../types';
 import { assertFile, asString, errorResult, MAX_FILE_BYTES } from '../validation';
+import {
+  checkPwnedPassword,
+  estimatePasswordStrength,
+  generatePassphrase,
+  generatePassword,
+} from '@/lib/security/password';
 
 const hashViaWebCrypto = async (algorithm: string, input: string): Promise<string> => {
   const encoder = new TextEncoder();
@@ -188,36 +194,95 @@ export const passwordGeneratorTool: ToolDefinition = {
   slug: 'password-generator',
   name: 'Password Generator',
   category: 'hashing',
-  description: 'Generate cryptographically secure random passwords with customizable length and character sets.',
-  shortDescription: 'Generate secure random passwords',
-  tags: ['password', 'random', 'secure', 'generator'],
+  description: 'Generate cryptographically secure passwords or multi-word passphrases without modulo bias.',
+  shortDescription: 'Generate secure passwords and passphrases',
+  tags: ['password', 'passphrase', 'random', 'secure', 'generator'],
   difficulty: 'beginner',
   executionType: 'client',
   isFeatured: true,
+  persistHistory: false,
   inputs: [
+    {
+      id: 'mode',
+      label: 'Generator Mode',
+      type: 'select',
+      defaultValue: 'password',
+      options: [
+        { label: 'Random Password', value: 'password' },
+        { label: 'Passphrase', value: 'passphrase' },
+      ],
+    },
     { id: 'length', label: 'Length', type: 'number', defaultValue: 16, helperText: 'Password length (8-128)' },
     { id: 'count', label: 'Count', type: 'number', defaultValue: 5, helperText: 'Number of passwords (1-20)' },
     { id: 'uppercase', label: 'Include Uppercase (A-Z)', type: 'checkbox', defaultValue: true },
     { id: 'lowercase', label: 'Include Lowercase (a-z)', type: 'checkbox', defaultValue: true },
     { id: 'numbers', label: 'Include Numbers (0-9)', type: 'checkbox', defaultValue: true },
     { id: 'symbols', label: 'Include Symbols (!@#$...)', type: 'checkbox', defaultValue: true },
+    { id: 'wordCount', label: 'Passphrase Word Count', type: 'number', defaultValue: 5, helperText: 'Passphrase words (4-12)' },
+    {
+      id: 'separator',
+      label: 'Passphrase Separator',
+      type: 'select',
+      defaultValue: '-',
+      options: [
+        { label: 'Hyphen (-)', value: '-' },
+        { label: 'Space', value: ' ' },
+        { label: 'Period (.)', value: '.' },
+        { label: 'Underscore (_)', value: '_' },
+      ],
+    },
+    { id: 'capitalizeWords', label: 'Capitalize Passphrase Words', type: 'checkbox', defaultValue: false },
+    { id: 'includePassphraseNumber', label: 'Include Random Number', type: 'checkbox', defaultValue: true },
   ],
   execute: async (inputs) => {
-    const length = Math.min(Math.max(Number(inputs.length) || 16, 8), 128);
+    const mode = inputs.mode === 'passphrase' ? 'passphrase' : 'password';
     const count = Math.min(Math.max(Number(inputs.count) || 5, 1), 20);
-    let charset = '';
-    if (inputs.uppercase) charset += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    if (inputs.lowercase) charset += 'abcdefghijklmnopqrstuvwxyz';
-    if (inputs.numbers) charset += '0123456789';
-    if (inputs.symbols) charset += '!@#$%^&*()_+-=[]{}|;:,.<>?';
-    if (!charset) charset = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    const generate = () => {
-      const arr = new Uint32Array(length);
-      crypto.getRandomValues(arr);
-      return Array.from(arr, v => charset[v % charset.length]).join('');
-    };
-    const passwords = Array.from({ length: count }, () => generate());
-    return { success: true, summary: `Generated ${count} password(s) of length ${length}`, data: { passwords, length, charsetSize: charset.length }, rawOutput: passwords.join('\n') };
+    try {
+      if (mode === 'passphrase') {
+        const wordCount = Math.min(Math.max(Number(inputs.wordCount) || 5, 4), 12);
+        const separator = typeof inputs.separator === 'string' ? inputs.separator : '-';
+        const passphrases = Array.from({ length: count }, () =>
+          generatePassphrase(
+            wordCount,
+            separator,
+            Boolean(inputs.capitalizeWords),
+            Boolean(inputs.includePassphraseNumber)
+          )
+        );
+        return {
+          success: true,
+          summary: `Generated ${count} passphrase(s) with ${wordCount} words`,
+          data: { passphrases, wordCount },
+          rawOutput: passphrases.join('\n'),
+          items: [
+            { label: 'Mode', value: 'Passphrase', status: 'info' },
+            { label: 'Word Count', value: String(wordCount), status: 'pass' },
+          ],
+        };
+      }
+
+      const length = Math.min(Math.max(Number(inputs.length) || 16, 8), 128);
+      const categories = {
+        uppercase: Boolean(inputs.uppercase),
+        lowercase: Boolean(inputs.lowercase),
+        numbers: Boolean(inputs.numbers),
+        symbols: Boolean(inputs.symbols),
+      };
+      const passwords = Array.from({ length: count }, () => generatePassword(length, categories));
+      return {
+        success: true,
+        summary: `Generated ${count} password(s) of length ${length}`,
+        data: { passwords, length, selectedCategories: Object.keys(categories).filter((key) => categories[key as keyof typeof categories]) },
+        rawOutput: passwords.join('\n'),
+        items: [
+          { label: 'Mode', value: 'Random password', status: 'info' },
+          { label: 'Length', value: String(length), status: 'pass' },
+          { label: 'Category Guarantee', value: 'Every selected category is present', status: 'pass' },
+        ],
+      };
+    } catch (error) {
+      return errorResult(error, 'Password generation failed');
+    }
   },
 };
 
@@ -226,43 +291,75 @@ export const passwordStrengthTool: ToolDefinition = {
   slug: 'password-strength',
   name: 'Password Strength Checker',
   category: 'hashing',
-  description: 'Analyze password strength based on length, character diversity, patterns, and entropy. Provides a security score and recommendations.',
-  shortDescription: 'Check password strength and entropy',
+  description: 'Estimate password resistance with zxcvbn-ts, pattern feedback, crack-time estimates, and optional HIBP breach status.',
+  shortDescription: 'Estimate password strength and breach status',
   tags: ['password', 'strength', 'security', 'entropy', 'audit'],
   difficulty: 'beginner',
   executionType: 'client',
   isFeatured: false,
+  persistHistory: false,
   inputs: [
-    { id: 'password', label: 'Password', type: 'text', placeholder: 'Enter password to analyze...', required: true },
+    { id: 'password', label: 'Password', type: 'password', placeholder: 'Enter password to analyze...', required: true },
+    {
+      id: 'checkBreach',
+      label: 'Check HIBP breach status using prefix-only k-anonymity',
+      type: 'checkbox',
+      defaultValue: false,
+      helperText: 'Optional. Only the first five SHA-1 characters leave the browser.',
+    },
   ],
   execute: async (inputs) => {
-    const pw = asString(inputs.password, 'Password', 1024);
-    let score = 0;
-    const checks: { label: string; value: string; status: 'pass' | 'warn' | 'fail' }[] = [];
-    // Length
-    if (pw.length >= 16) { score += 30; checks.push({ label: 'Length', value: `${pw.length} chars (excellent)`, status: 'pass' }); }
-    else if (pw.length >= 12) { score += 20; checks.push({ label: 'Length', value: `${pw.length} chars (good)`, status: 'pass' }); }
-    else if (pw.length >= 8) { score += 10; checks.push({ label: 'Length', value: `${pw.length} chars (minimum)`, status: 'warn' }); }
-    else { checks.push({ label: 'Length', value: `${pw.length} chars (too short)`, status: 'fail' }); }
-    // Character types
-    if (/[a-z]/.test(pw)) { score += 10; checks.push({ label: 'Lowercase', value: 'Present', status: 'pass' }); } else checks.push({ label: 'Lowercase', value: 'Missing', status: 'warn' });
-    if (/[A-Z]/.test(pw)) { score += 10; checks.push({ label: 'Uppercase', value: 'Present', status: 'pass' }); } else checks.push({ label: 'Uppercase', value: 'Missing', status: 'warn' });
-    if (/[0-9]/.test(pw)) { score += 10; checks.push({ label: 'Numbers', value: 'Present', status: 'pass' }); } else checks.push({ label: 'Numbers', value: 'Missing', status: 'warn' });
-    if (/[^a-zA-Z0-9]/.test(pw)) { score += 15; checks.push({ label: 'Symbols', value: 'Present', status: 'pass' }); } else checks.push({ label: 'Symbols', value: 'Missing', status: 'warn' });
-    // Patterns
-    if (/(.)\1{2,}/.test(pw)) { score -= 10; checks.push({ label: 'Repeated chars', value: 'Found', status: 'fail' }); }
-    if (/^[a-zA-Z]+$/.test(pw)) { score -= 5; checks.push({ label: 'Letters only', value: 'Weak pattern', status: 'warn' }); }
-    // Entropy
-    let charsetSize = 0;
-    if (/[a-z]/.test(pw)) charsetSize += 26;
-    if (/[A-Z]/.test(pw)) charsetSize += 26;
-    if (/[0-9]/.test(pw)) charsetSize += 10;
-    if (/[^a-zA-Z0-9]/.test(pw)) charsetSize += 32;
-    const entropy = Math.round(pw.length * Math.log2(charsetSize || 1));
-    checks.push({ label: 'Entropy', value: `${entropy} bits`, status: entropy >= 60 ? 'pass' : entropy >= 40 ? 'warn' : 'fail' });
-    score = Math.max(0, Math.min(100, score));
-    const strength = score >= 80 ? 'Strong' : score >= 50 ? 'Moderate' : score >= 30 ? 'Weak' : 'Very Weak';
-    return { success: true, summary: `${strength} (${score}/100) — ${entropy} bits entropy`, data: { score, strength, entropy }, rawOutput: JSON.stringify({ score, strength, entropy, checks }, null, 2), items: checks };
+    const password = asString(inputs.password, 'Password', 1024);
+    const estimate = estimatePasswordStrength(password);
+    const strengthLabels = ['Very weak', 'Weak', 'Fair', 'Strong', 'Very strong'] as const;
+    const patternWarnings = Array.from(new Set(estimate.sequence.map((match) => match.pattern)));
+    const recommendations = [
+      ...estimate.feedback.suggestions,
+      ...(estimate.score < 3 ? ['Use a longer, unique passphrase generated by a password manager.'] : []),
+      'Do not reuse this password across services.',
+    ];
+
+    let breachStatus = 'Not checked';
+    let breachCount = 0;
+    if (inputs.checkBreach) {
+      try {
+        const breach = await checkPwnedPassword(password);
+        breachCount = breach.breachCount;
+        breachStatus = breach.pwned
+          ? `Found ${breach.breachCount.toLocaleString()} time(s)`
+          : 'Not found in HIBP range';
+      } catch {
+        breachStatus = 'Unavailable';
+      }
+    }
+
+    const resultData = {
+      score: estimate.score,
+      strength: strengthLabels[estimate.score],
+      crackTimes: estimate.crackTimesDisplay,
+      warning: estimate.feedback.warning || 'No specific pattern warning.',
+      feedback: estimate.feedback.suggestions,
+      patterns: patternWarnings,
+      breachStatus,
+      breachCount,
+      recommendations,
+    };
+    return {
+      success: true,
+      summary: `${strengthLabels[estimate.score]} (${estimate.score}/4); breach status: ${breachStatus}`,
+      data: resultData,
+      rawOutput: JSON.stringify(resultData, null, 2),
+      severity: breachCount > 0 ? 'critical' : estimate.score < 2 ? 'high' : estimate.score < 3 ? 'medium' : 'info',
+      items: [
+        { label: 'zxcvbn-ts Score', value: `${estimate.score}/4`, status: estimate.score >= 3 ? 'pass' : estimate.score === 2 ? 'warn' : 'fail' },
+        { label: 'Offline Fast Hash', value: estimate.crackTimesDisplay.offlineFastHashing1e10PerSecond, status: estimate.score >= 3 ? 'pass' : 'warn' },
+        { label: 'Online Throttled', value: estimate.crackTimesDisplay.onlineThrottling100PerHour, status: estimate.score >= 2 ? 'pass' : 'warn' },
+        { label: 'Pattern Warning', value: estimate.feedback.warning || 'None', status: estimate.feedback.warning ? 'warn' : 'pass' },
+        { label: 'Patterns', value: patternWarnings.join(', ') || 'No common pattern detected', status: patternWarnings.length ? 'warn' : 'pass' },
+        { label: 'Breach Status', value: breachStatus, status: breachCount > 0 ? 'fail' : breachStatus === 'Unavailable' ? 'warn' : 'pass' },
+        { label: 'Recommendations', value: recommendations.join(' '), status: estimate.score >= 3 && breachCount === 0 ? 'info' : 'warn' },
+      ],
+    };
   },
 };
 
@@ -277,38 +374,21 @@ export const pwnedPasswordTool: ToolDefinition = {
   difficulty: 'beginner',
   executionType: 'server',
   isFeatured: true,
+  persistHistory: false,
   inputs: [
     {
       id: 'password',
       label: 'Password',
-      type: 'text',
+      type: 'password',
       placeholder: 'Enter password to check...',
       required: true,
-      helperText: 'The password is SHA-1 hashed in your browser. Only the hash prefix and suffix are sent to CyberKit.',
+      helperText: 'The password is SHA-1 hashed locally. Only the first five hash characters are sent; suffix matching stays in this browser.',
     },
   ],
   execute: async (inputs) => {
     const password = asString(inputs.password, 'Password', 1024);
-    const sha1 = (await hashViaWebCrypto('SHA-1', password)).toUpperCase();
-    const hashPrefix = sha1.slice(0, 5);
-    const hashSuffix = sha1.slice(5);
-
     try {
-      const response = await fetch('/api/pwned-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hashPrefix, hashSuffix }),
-      });
-
-      const resData = await response.json();
-      if (!resData.success) {
-        return {
-          success: false,
-          summary: resData.error || 'Pwned Passwords lookup failed',
-          data: {},
-          rawOutput: `Error: ${resData.error || 'HIBP range lookup failed'}`,
-        };
-      }
+      const resData = await checkPwnedPassword(password);
 
       const raw = `Provider: ${resData.provider}
 Hash prefix sent: ${resData.hashPrefix}
@@ -324,7 +404,7 @@ Seen count: ${resData.breachCount.toLocaleString()}
         data: resData,
         rawOutput: raw,
         severity: resData.pwned ? 'critical' : 'info',
-        explanation: 'The Pwned Passwords range API uses k-anonymity. CyberKit hashes the password in the browser, sends only the first 5 SHA-1 characters to HIBP through the backend, then checks whether the returned suffix list contains the remaining hash suffix.',
+        explanation: 'The password and full SHA-1 digest remain in the browser. CyberKit sends only the first five SHA-1 characters, receives a parsed HIBP range, and performs suffix matching locally.',
         items: [
           { label: 'Pwned', value: resData.pwned ? 'YES' : 'No', status: resData.pwned ? 'fail' : 'pass' },
           { label: 'Seen Count', value: resData.breachCount.toLocaleString(), status: resData.pwned ? 'fail' : 'pass' },

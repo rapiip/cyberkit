@@ -1,42 +1,94 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useEffect, useMemo, useState, type ElementType } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
-  Search, Shield, Globe, Hash, Binary, FileSearch, Eye, Flag,
-  FlaskConical, Network, ArrowRight, Zap, Command, Star, Clock,
+  ArrowRight,
+  Bug,
+  FileSearch,
+  Globe2,
+  LockKeyhole,
+  Radar,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  TerminalSquare,
 } from 'lucide-react';
-import { categories } from '@/lib/tools/categories';
-import { allToolMetadata, getFeaturedToolMetadata, searchToolMetadata } from '@/lib/tools/metadata';
+import WorkspaceIcon from '@/components/workspaces/WorkspaceIcon';
 import { useHistoryStore } from '@/lib/store';
+import {
+  priorityWorkspaces,
+  searchWorkspaceNavigation,
+} from '@/lib/tools/workspace-navigation';
 
-const categoryIcons: Record<string, React.ReactNode> = {
-  'web-security': <Shield size={20} />,
-  dns: <Globe size={20} />,
-  network: <Network size={20} />,
-  encoding: <Binary size={20} />,
-  hashing: <Hash size={20} />,
-  forensics: <FileSearch size={20} />,
-  osint: <Eye size={20} />,
-  ctf: <Flag size={20} />,
-  labs: <FlaskConical size={20} />,
-};
+interface GoalEntry {
+  title: string;
+  description: string;
+  href: string;
+  action: string;
+  icon: ElementType;
+  secondary?: { label: string; href: string };
+}
 
-const quickActions = [
-  { label: 'Decode JWT', href: '/tools/jwt-decoder', icon: '🔑' },
-  { label: 'Generate Hash', href: '/tools/sha256-generator', icon: '🔐' },
-  { label: 'Base64 Encode', href: '/tools/base64', icon: '📝' },
-  { label: 'Password Gen', href: '/tools/password-generator', icon: '🛡️' },
-  { label: 'URL Analyzer', href: '/tools/url-analyzer', icon: '🔗' },
-  { label: 'IOC Extractor', href: '/tools/ioc-extractor', icon: '🎯' },
-  { label: 'Regex Tester', href: '/tools/regex-tester', icon: '⚡' },
-  { label: 'CIDR Calculator', href: '/tools/cidr-calculator', icon: '🌐' },
+const goalEntries: GoalEntry[] = [
+  {
+    title: 'Audit a website',
+    description: 'Review TLS, headers, CORS, policies, robots.txt, and security.txt in one workflow.',
+    href: '/workspaces/website-security-audit',
+    action: 'Start website audit',
+    icon: ShieldCheck,
+  },
+  {
+    title: 'Investigate a domain or IP',
+    description: 'Correlate DNS, DoH, registration, IP, ASN, and reputation context.',
+    href: '/workspaces/domain-ip-intelligence',
+    action: 'Start investigation',
+    icon: Radar,
+  },
+  {
+    title: 'Analyze a file or log',
+    description: 'Inspect metadata, signatures, strings, hashes, and indicators locally.',
+    href: '/workspaces/file-triage-ioc',
+    action: 'Open file triage',
+    icon: FileSearch,
+  },
+  {
+    title: 'Find secrets or IOCs',
+    description: 'Scan text and source material for exposed credentials and actionable indicators.',
+    href: '/workspaces/secret-scanner',
+    action: 'Scan for secrets',
+    icon: Search,
+    secondary: { label: 'Extract IOCs', href: '/workspaces/file-triage-ioc?tool=ioc-extractor' },
+  },
+  {
+    title: 'Check CVE and KEV',
+    description: 'Look up vulnerability records and known-exploitation context.',
+    href: '/workspaces/cve-kev-intelligence',
+    action: 'Check vulnerability',
+    icon: Bug,
+  },
+  {
+    title: 'Analyze a password or JWT',
+    description: 'Assess password exposure and inspect token structure and claims.',
+    href: '/workspaces/password-security',
+    action: 'Analyze password',
+    icon: LockKeyhole,
+    secondary: { label: 'Inspect JWT', href: '/workspaces/jwt-inspector' },
+  },
+  {
+    title: 'Decode a payload',
+    description: 'Use transformation pipelines and focused CTF decoder utilities.',
+    href: '/workspaces/ctf-decoder-workbench',
+    action: 'Open decoder',
+    icon: TerminalSquare,
+    secondary: { label: 'Transform data', href: '/workspaces/data-transformation' },
+  },
 ];
 
 const fadeUp = {
-  initial: { opacity: 0, y: 20 },
+  initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0 },
 };
 
@@ -44,174 +96,152 @@ export default function Dashboard() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const featured = getFeaturedToolMetadata();
   const { entries, loadFromStorage } = useHistoryStore();
   const searchResults = useMemo(
-    () => (searchQuery.trim() ? searchToolMetadata(searchQuery).slice(0, 8) : []),
+    () => (searchQuery.trim() ? searchWorkspaceNavigation(searchQuery).slice(0, 8) : []),
     [searchQuery]
   );
-  const showSearch = isSearchFocused && searchResults.length > 0;
+  const showSearch = isSearchFocused && searchQuery.trim().length > 0;
 
-  useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
-      {/* Hero Section */}
-      <motion.div {...fadeUp} transition={{ duration: 0.5 }} className="text-center space-y-4 py-6">
-        <h1 className="text-3xl md:text-4xl font-bold">
-          <span className="gradient-text">CyberKit</span>
-        </h1>
-        <p className="text-muted-foreground text-sm md:text-base max-w-xl mx-auto">
-          A fast, unified cybersecurity toolkit for web security, encoding, hashing, forensics, and security labs.
-        </p>
+    <div className="mx-auto max-w-7xl space-y-10 p-4 pt-20 md:p-8">
+      <motion.header {...fadeUp} transition={{ duration: 0.4 }} className="space-y-5 py-4 text-center">
+        <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-cyber-cyan/20 bg-cyber-cyan/5 px-3 py-1 text-xs text-cyber-cyan">
+          <Sparkles size={13} />
+          Outcome-driven security workflows
+        </div>
+        <div>
+          <h1 className="text-3xl font-bold md:text-5xl">
+            Start with the <span className="gradient-text">security outcome</span>
+          </h1>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
+            CyberKit combines related checks into focused workspaces. Utility tools remain available
+            inside each workflow without crowding the primary navigation.
+          </p>
+        </div>
 
-        {/* Search Bar */}
-        <div className="relative max-w-lg mx-auto mt-6">
-          <div className="relative">
-            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tools... (or press Ctrl+K)"
-              className="input-cyber pl-11 pr-20 py-3 text-sm"
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-            />
-            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-0.5 px-2 py-1 rounded bg-muted text-[10px] text-muted-foreground font-mono">
-              <Command size={10} /> K
-            </kbd>
-          </div>
-
-          {/* Search Dropdown */}
-          {showSearch && searchResults.length > 0 && (
-            <div className="absolute w-full mt-2 glass-card py-2 z-20">
-              {searchResults.map((tool) => (
-                <button
-                  key={tool.id}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm hover:bg-surface-hover transition-colors"
-                  onMouseDown={() => router.push(`/tools/${tool.slug}`)}
-                >
-                  <span className="flex-1 font-medium">{tool.name}</span>
-                  <span className="badge badge-cyan text-[10px]">{tool.category}</span>
-                </button>
-              ))}
+        <div className="relative mx-auto max-w-xl text-left">
+          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => window.setTimeout(() => setIsSearchFocused(false), 150)}
+            placeholder="Search workflows or capabilities"
+            aria-label="Search workflows or capabilities"
+            className="input-cyber py-3 pl-11 pr-4 text-sm"
+          />
+          {showSearch && (
+            <div className="glass-card absolute z-20 mt-2 w-full overflow-hidden py-2">
+              {searchResults.length > 0 ? (
+                searchResults.map((result) => (
+                  <button
+                    key={`${result.kind}-${result.id}`}
+                    type="button"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-hover"
+                    onClick={() => router.push(result.href)}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium">{result.name}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {result.kind === 'tool' ? `In ${result.workspaceName}` : result.description}
+                      </span>
+                    </span>
+                    <span className="badge badge-cyan capitalize">{result.kind}</span>
+                  </button>
+                ))
+              ) : (
+                <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  No workspace or capability matched &quot;{searchQuery}&quot;.
+                </div>
+              )}
             </div>
           )}
         </div>
-      </motion.div>
+      </motion.header>
 
-      {/* Quick Actions */}
-      <motion.section {...fadeUp} transition={{ duration: 0.5, delay: 0.1 }}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Zap size={18} className="text-cyber-amber" /> Quick Actions
-          </h2>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {quickActions.map((action) => (
-            <Link
-              key={action.href}
-              href={action.href}
-              className="glass-card flex items-center gap-3 px-4 py-3 hover:border-cyber-cyan/30 transition-all group"
-            >
-              <span className="text-xl">{action.icon}</span>
-              <span className="text-sm font-medium group-hover:text-cyber-cyan transition-colors">{action.label}</span>
-            </Link>
-          ))}
-        </div>
-      </motion.section>
-
-      {/* Featured Tools */}
-      <motion.section {...fadeUp} transition={{ duration: 0.5, delay: 0.2 }}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Star size={18} className="text-cyber-amber" /> Featured Tools
-          </h2>
-          <Link href="/tools" className="text-xs text-muted-foreground hover:text-cyber-cyan flex items-center gap-1">
-            View All <ArrowRight size={12} />
+      <motion.section {...fadeUp} transition={{ duration: 0.4, delay: 0.08 }} aria-labelledby="goal-entry-points">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 id="goal-entry-points" className="text-xl font-semibold">What do you need to do?</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Seven common workflows, each with a clear starting point.</p>
+          </div>
+          <Link href="/workspaces" className="flex items-center gap-1 text-xs text-cyber-cyan">
+            Browse all workspaces <ArrowRight size={13} />
           </Link>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {featured.slice(0, 6).map((tool) => (
-            <Link
-              key={tool.id}
-              href={`/tools/${tool.slug}`}
-              className="glass-card p-4 hover:border-cyber-cyan/30 transition-all group"
-            >
-              <div className="flex items-start justify-between mb-2">
-                <h3 className="font-medium text-sm group-hover:text-cyber-cyan transition-colors">{tool.name}</h3>
-                <span className="badge badge-cyan text-[10px]">{tool.executionType}</span>
-              </div>
-              <p className="text-xs text-muted-foreground mb-3">{tool.shortDescription}</p>
-              <div className="flex items-center gap-2">
-                <span className="badge badge-green text-[10px]">{tool.category}</span>
-                <span className="badge badge-purple text-[10px]">{tool.difficulty}</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </motion.section>
-
-      {/* Categories */}
-      <motion.section {...fadeUp} transition={{ duration: 0.5, delay: 0.3 }}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Tool Categories</h2>
-          <span className="text-xs text-muted-foreground">{allToolMetadata.length} tools total</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {categories.filter(c => c.id !== 'labs').map((cat) => {
-            const toolCount = allToolMetadata.filter((t) => t.category === cat.id).length;
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {goalEntries.map((goal) => {
+            const Icon = goal.icon;
             return (
-              <Link
-                key={cat.id}
-                href={`/tools?category=${cat.id}`}
-                className="glass-card p-4 hover:border-cyber-cyan/30 transition-all group"
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{ background: `${cat.gradient}`, opacity: 0.9 }}
-                  >
-                    <span className="text-white">{categoryIcons[cat.id]}</span>
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-sm group-hover:text-cyber-cyan transition-colors">{cat.name}</h3>
-                    <span className="text-xs text-muted-foreground">{toolCount} tools</span>
-                  </div>
+              <article key={goal.title} className="glass-card flex min-h-52 flex-col p-5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/10 text-cyber-cyan">
+                  <Icon size={20} aria-hidden="true" />
                 </div>
-                <p className="text-xs text-muted-foreground">{cat.description}</p>
-              </Link>
+                <h3 className="mt-4 font-semibold">{goal.title}</h3>
+                <p className="mt-2 flex-1 text-sm leading-6 text-muted-foreground">{goal.description}</p>
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <Link href={goal.href} className="btn-primary text-xs">
+                    {goal.action} <ArrowRight size={13} />
+                  </Link>
+                  {goal.secondary && (
+                    <Link href={goal.secondary.href} className="text-xs text-muted-foreground hover:text-cyber-cyan">
+                      {goal.secondary.label}
+                    </Link>
+                  )}
+                </div>
+              </article>
             );
           })}
         </div>
       </motion.section>
 
-      {/* Recent Activity */}
-      {entries.length > 0 && (
-        <motion.section {...fadeUp} transition={{ duration: 0.5, delay: 0.4 }}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Clock size={18} className="text-muted-foreground" /> Recent Activity
-            </h2>
-            <Link href="/history" className="text-xs text-muted-foreground hover:text-cyber-cyan flex items-center gap-1">
-              View All <ArrowRight size={12} />
+      <motion.section {...fadeUp} transition={{ duration: 0.4, delay: 0.14 }} aria-labelledby="priority-workspaces">
+        <div className="mb-4">
+          <h2 id="priority-workspaces" className="text-xl font-semibold">Priority workspaces</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Core workflows surfaced for routine security work.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {priorityWorkspaces.map((workspace) => (
+            <Link
+              key={workspace.id}
+              href={workspace.canonicalPath}
+              className="glass-card group flex items-center gap-3 p-4 transition-all hover:border-cyber-cyan/35"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyber-cyan/10 text-cyber-cyan">
+                <WorkspaceIcon name={workspace.icon} size={18} />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium group-hover:text-cyber-cyan">{workspace.name}</span>
+                <span className="text-xs text-muted-foreground">{workspace.goal}</span>
+              </span>
             </Link>
+          ))}
+        </div>
+      </motion.section>
+
+      {entries.length > 0 && (
+        <section aria-labelledby="recent-activity">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 id="recent-activity" className="text-lg font-semibold">Recent activity</h2>
+            <Link href="/history" className="text-xs text-muted-foreground hover:text-cyber-cyan">View history</Link>
           </div>
           <div className="glass-card divide-y divide-border">
-            {entries.slice(0, 5).map((entry) => (
+            {entries.slice(0, 4).map((entry) => (
               <div key={entry.id} className="flex items-center gap-3 px-4 py-3">
-                <div className={`w-2 h-2 rounded-full ${entry.status === 'success' ? 'bg-status-pass' : entry.status === 'error' ? 'bg-status-fail' : 'bg-status-warn'}`} />
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium">{entry.toolName}</span>
-                  <span className="text-xs text-muted-foreground ml-2 truncate">{entry.input.substring(0, 40)}</span>
-                </div>
-                <span className="text-[11px] text-muted-foreground shrink-0">
+                <Globe2 size={15} className="shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{entry.toolName}</span>
+                <span className="text-xs text-muted-foreground">
                   {new Date(entry.createdAt).toLocaleDateString()}
                 </span>
               </div>
             ))}
           </div>
-        </motion.section>
+        </section>
       )}
     </div>
   );
