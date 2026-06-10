@@ -121,6 +121,13 @@ export default function SettingsPage() {
       });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || data.error || 'Cloud restore failed');
+      if (data.expired) {
+        throw new Error(
+          typeof data.expiresAt === 'string'
+            ? `Cloud backup expired at ${new Date(data.expiresAt).toLocaleString()}.`
+            : 'Cloud backup has expired.'
+        );
+      }
       if (!data.found || !data.envelope) throw new Error('No cloud data found for this Sync ID');
       const decrypted = await decryptSyncData<unknown>(
         data.envelope as EncryptedSyncEnvelope,
@@ -202,7 +209,8 @@ export default function SettingsPage() {
           Your browser encrypts exports with AES-256-GCM. The key is derived locally with
           PBKDF2-SHA-256 and a random salt. The server receives only the Sync ID plus
           ciphertext, IV, salt, format version, and timestamp. The passphrase and plaintext
-          are never sent or stored. Backups expire automatically.
+          are never sent or stored. Integrity is validated during restore, wrong-passphrase
+          failures are explicit, and backups expire automatically.
         </div>
         <div className="flex flex-wrap gap-3">
           <button
@@ -255,7 +263,8 @@ export default function SettingsPage() {
       <div className="text-center text-xs text-muted-foreground py-4">
         History, favorites, and saved reports are stored locally in your browser. Password and JWT
         panels never write inputs or results to history, reports, analytics, or localStorage. Pwned
-        Password sends only a five-character SHA-1 prefix. Cloud Sync sends only encrypted data.
+        Password sends only a five-character SHA-1 prefix. Cloud Sync sends only a versioned,
+        encrypted envelope.
       </div>
     </div>
   );

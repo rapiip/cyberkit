@@ -47,7 +47,7 @@ JWT parsing and verification run locally. The inspector:
 
 Decoded tokens are never described as authentic. Only a successful Web Crypto
 signature operation produces `verified`. Sensitive claim values are masked in
-the rendered and exported result. Tokens and verification material are excluded
+the rendered result. Tokens and verification material are excluded
 from persistent stores and Cloud Sync.
 
 ## Cloud Sync
@@ -78,5 +78,37 @@ The passphrase and plaintext export never cross the network. Redis keys use a
 SHA-256 digest of the Sync ID. Stored envelopes expire after 30 days by default;
 `CLOUD_SYNC_RETENTION_DAYS` can select 1-90 days. AES-GCM authentication produces
 a specific wrong-passphrase-or-corrupt-data error without importing anything.
+Restore checks format version, integrity, and expiry before import. Decrypted
+plaintext bytes are zeroed from the working buffer immediately after parsing.
 
 There is no server-side recovery for a forgotten passphrase.
+
+## Secret Scanner
+
+Secret scanning runs in browser memory by default. CyberKit can scan pasted text
+or uploaded local files without sending them to the server.
+
+- findings are redacted by default and shown only as masked previews;
+- each finding includes the detected type, file/location, line, column, and
+  confidence;
+- entropy thresholds, allowlist terms, comment skipping, fixture/test-path
+  skipping, deduplication, and placeholder filtering reduce false positives;
+- raw secrets are not written to history, reports, analytics, `localStorage`,
+  exports, or Cloud Sync.
+
+## File Triage & IOC Analysis
+
+File triage and IOC analysis also run locally by default.
+
+- file typing uses magic-byte detection plus browser-declared MIME and filename
+  extension checks;
+- EXIF parsing uses `exifr`;
+- MIME and signature detection use `file-type` with a local plain-text fallback;
+- hashes, entropy, printable strings, metadata, embedded URLs, and IOC
+  candidates are derived in the browser;
+- IOC extraction supports defanged indicators such as `hxxps://` and `[.]`,
+  then validates IPs, domains, URLs, emails, and common hash lengths locally.
+
+Provider enrichment is not performed unless the user explicitly requests it.
+This build does not have an enrichment provider configured, so explicit consent
+still results in local-only processing.

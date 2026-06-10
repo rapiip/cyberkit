@@ -6,11 +6,12 @@ import {
   consumeRateLimit,
   errorResponse,
   envHeader,
-  fetchWithTimeout,
+  fetchWithRetry,
   jsonError,
   normalizeHostname,
   parseJsonBody,
   rateLimitResponse,
+  readJsonResponse,
   resolveAndBlockPrivateIp,
   TIMEOUTS,
 } from '@/lib/server/scanner';
@@ -32,9 +33,9 @@ interface IpApiResponse {
 }
 
 async function optionalJson(url: string, init: RequestInit, timeoutMs = TIMEOUTS.httpMs) {
-  const response = await fetchWithTimeout(url, init, timeoutMs);
+  const response = await fetchWithRetry(url, init, timeoutMs);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json() as Promise<unknown>;
+  return readJsonResponse(response);
 }
 
 async function getThreatIntel(ip: string, hostname: string) {
@@ -110,12 +111,12 @@ export async function POST(request: Request) {
     if (rate.limited) return rateLimitResponse(rate.retryAfter);
 
     const data = await cachedJson(`ip-api:${resolvedIp}`, 10 * 60_000, async () => {
-      const response = await fetchWithTimeout(
+      const response = await fetchWithRetry(
         `http://ip-api.com/json/${encodeURIComponent(resolvedIp)}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query`,
         { headers: { Accept: 'application/json' } },
         TIMEOUTS.httpMs
       );
-      return (await response.json()) as IpApiResponse;
+      return await readJsonResponse<IpApiResponse>(response);
     });
 
     if (data.status !== 'success') {
@@ -136,6 +137,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
+      provider: 'IP-API',
+      timestamp: new Date().toISOString(),
+      confidence: 'medium',
       input: query,
       ip: resolvedIp,
       country: data.country,
@@ -149,6 +153,7 @@ export async function POST(request: Request) {
       isp: data.isp,
       organization: data.org,
       asn: data.as,
+      precisionDisclaimer: 'IP geolocation is approximate and must not be treated as a precise physical location.',
       threatIntel,
     });
   } catch (error) {

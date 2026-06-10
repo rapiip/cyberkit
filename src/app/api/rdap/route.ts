@@ -4,10 +4,11 @@ import {
   cachedJson,
   consumeRateLimit,
   errorResponse,
-  fetchWithTimeout,
+  fetchWithRetry,
   jsonError,
   parseJsonBody,
   rateLimitResponse,
+  readJsonResponse,
   TIMEOUTS,
 } from '@/lib/server/scanner';
 
@@ -61,25 +62,25 @@ function tldForDomain(domain: string) {
 }
 
 async function fetchRdapJson(url: string) {
-  const response = await fetchWithTimeout(
+  const response = await fetchWithRetry(
     url,
     { headers: { Accept: 'application/rdap+json, application/json' } },
     TIMEOUTS.dnsRdapMs
   );
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`RDAP lookup failed with HTTP ${response.status}`);
-  return (await response.json()) as RdapDomainResponse;
+  return await readJsonResponse<RdapDomainResponse>(response);
 }
 
 async function getBootstrapRdapBase(tld: string) {
   const bootstrap = await cachedJson('iana:rdap:dns-bootstrap', 24 * 60 * 60_000, async () => {
-    const response = await fetchWithTimeout(
+    const response = await fetchWithRetry(
       'https://data.iana.org/rdap/dns.json',
       { headers: { Accept: 'application/json' } },
       TIMEOUTS.dnsRdapMs
     );
     if (!response.ok) throw new Error(`IANA RDAP bootstrap returned HTTP ${response.status}`);
-    return (await response.json()) as BootstrapResponse;
+    return await readJsonResponse<BootstrapResponse>(response);
   });
 
   const service = bootstrap.services?.find(([tlds]) => tlds.map((item) => item.toLowerCase()).includes(tld));
@@ -131,6 +132,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       provider,
+      timestamp: new Date().toISOString(),
+      confidence: data.objectClassName === 'domain' ? 'high' : 'medium',
+      partial: false,
       domain,
       domainName: data.ldhName || data.unicodeName || domain,
       status: data.status || [],

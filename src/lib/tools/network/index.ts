@@ -214,11 +214,16 @@ export const ipLookupTool: ToolDefinition = {
         { label: 'City & Region', value: `${resData.city}, ${resData.region}`, status: 'info' as const },
         { label: 'ISP', value: resData.isp || 'unknown', status: 'info' as const },
         { label: 'ASN', value: resData.asn || 'unknown', status: 'info' as const },
+        { label: 'Provider', value: resData.provider || 'unknown', status: 'info' as const },
+        { label: 'Timestamp', value: resData.timestamp || 'N/A', status: 'info' as const },
+        { label: 'Geo Precision', value: resData.precisionDisclaimer || 'Approximate', status: 'warn' as const },
       ];
 
       const raw = `Input: ${resData.input}
 Resolved IP: ${resData.ip}
 ----------------------------------------
+Provider: ${resData.provider || 'N/A'}
+Timestamp: ${resData.timestamp || 'N/A'}
 Location Info:
   Country: ${resData.country} (${resData.countryCode})
   Region: ${resData.region}
@@ -230,6 +235,7 @@ Network Routing:
   ISP: ${resData.isp}
   Organization: ${resData.organization || 'N/A'}
   ASN: ${resData.asn}
+Precision Disclaimer: ${resData.precisionDisclaimer || 'IP geolocation is approximate.'}
 `;
 
       return {

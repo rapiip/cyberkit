@@ -6,14 +6,28 @@ interface MxRecordResult {
   priority: number;
 }
 
-type DnsRecordValue = string[] | MxRecordResult[];
+interface RecordEnvelope {
+  provider: string;
+  timestamp: string;
+  confidence: string;
+  ttl: number | null;
+  unavailable: boolean;
+  values: Array<string | MxRecordResult | Record<string, unknown>>;
+  error?: string;
+}
 
 interface DnsLookupApiResponse extends Record<string, unknown> {
   success: boolean;
   error?: string;
   hostname?: string;
-  resolvedIp?: string;
-  records?: Record<string, DnsRecordValue>;
+  timestamp?: string;
+  partial?: boolean;
+  records?: Record<string, RecordEnvelope>;
+  helpers?: {
+    spf?: { value: string | null; present: boolean };
+    dmarc?: { value: string | null; present: boolean };
+    dkim?: { selectorsChecked: string[]; selectorsFound: string[]; present: boolean };
+  };
 }
 
 export const dnsLookupTool: ToolDefinition = {
@@ -60,35 +74,49 @@ export const dnsLookupTool: ToolDefinition = {
       const records = resData.records || {};
       const rawLines: string[] = [];
       rawLines.push(`DNS Lookup Results for: ${resData.hostname}`);
-      rawLines.push(`Resolved IP: ${resData.resolvedIp || 'N/A'}`);
+      rawLines.push(`Provider Timestamp: ${resData.timestamp || 'N/A'}`);
       rawLines.push('========================================\n');
 
       const items: ToolResultItem[] = [];
 
-      if (resData.resolvedIp) {
-        items.push({ label: 'Resolved IP', value: resData.resolvedIp, status: 'info' });
-      }
-
-      const recordTypes = ['A', 'AAAA', 'MX', 'TXT', 'NS', 'CNAME', 'PTR'] as const;
+      const recordTypes = ['A', 'AAAA', 'MX', 'TXT', 'NS', 'CAA', 'SOA', 'PTR'] as const;
       recordTypes.forEach((type) => {
-        const val = records[type];
-        if (val && val.length > 0) {
-          rawLines.push(`[${type} Records]`);
-          
+        const record = records[type];
+        if (record) {
+          rawLines.push(`[${type} Records] Provider=${record.provider} Confidence=${record.confidence} TTL=${record.ttl ?? 'N/A'}`);
+          if (record.unavailable) {
+            rawLines.push(`- Unavailable: ${record.error || 'No response'}`);
+            items.push({ label: `${type} Status`, value: 'Unavailable', status: 'warn' });
+            rawLines.push('');
+            return;
+          }
+
+          const val = record.values;
           if (type === 'MX') {
             (val as MxRecordResult[]).forEach((r) => {
               rawLines.push(`- Exchange: ${r.exchange} | Priority: ${r.priority}`);
               items.push({ label: 'MX Record', value: `${r.exchange} (Priority: ${r.priority})`, status: 'info' });
             });
           } else {
-            (val as string[]).forEach((r) => {
-              rawLines.push(`- ${r}`);
-              items.push({ label: `${type} Record`, value: r, status: 'info' });
+            (val as Array<string | Record<string, unknown>>).forEach((r) => {
+              const rendered = typeof r === 'string' ? r : JSON.stringify(r);
+              rawLines.push(`- ${rendered}`);
+              items.push({ label: `${type} Record`, value: rendered, status: 'info' });
             });
           }
           rawLines.push('');
         }
       });
+
+      if (resData.helpers?.spf) {
+        items.push({ label: 'SPF', value: resData.helpers.spf.present ? resData.helpers.spf.value || 'present' : 'not found', status: resData.helpers.spf.present ? 'pass' : 'warn' });
+      }
+      if (resData.helpers?.dmarc) {
+        items.push({ label: 'DMARC', value: resData.helpers.dmarc.present ? resData.helpers.dmarc.value || 'present' : 'not found', status: resData.helpers.dmarc.present ? 'pass' : 'warn' });
+      }
+      if (resData.helpers?.dkim) {
+        items.push({ label: 'DKIM', value: resData.helpers.dkim.present ? `selectors: ${resData.helpers.dkim.selectorsFound.join(', ')}` : 'not found in common selectors', status: resData.helpers.dkim.present ? 'pass' : 'warn' });
+      }
 
       if (items.length === 0) {
         rawLines.push('No DNS records found for this domain.');
@@ -98,15 +126,10 @@ export const dnsLookupTool: ToolDefinition = {
 
       return {
         success: true,
-        summary: `Resolved ${resData.hostname} — Found ${items.length} records`,
+        summary: `${resData.hostname} — ${items.length} result item(s)${resData.partial ? ' (partial)' : ''}`,
         data: resData,
         rawOutput: raw,
-        explanation: `DNS (Domain Name System) maps human-readable domain names like "${resData.hostname}" to machine-readable IP addresses. We retrieved:\n` +
-          `- A records: IPv4 Addresses\n` +
-          `- AAAA records: IPv6 Addresses\n` +
-          `- MX records: Mail server targets\n` +
-          `- TXT records: Auxiliary text (SPF, domain verification, etc.)\n` +
-          `- NS records: Authoritative DNS servers`,
+        explanation: `DNS maps domain names like "${resData.hostname}" to network records. Results include provider metadata, timestamps, TTL when available, partial-result handling, and email-authentication helpers for SPF, DMARC, and common DKIM selectors.`,
         items,
       };
     } catch (err: unknown) {
@@ -182,40 +205,38 @@ export const dnsOverHttpsTool: ToolDefinition = {
       const rawLines = [
         `Provider: ${resData.provider}`,
         `Hostname: ${resData.hostname}`,
+        `Timestamp: ${resData.timestamp || 'N/A'}`,
         '========================================',
       ];
 
-      for (const result of resData.results as {
+      for (const result of resData.comparisons as {
         type: string;
-        status: number;
-        dnssecAuthenticated: boolean;
-        answers: { data: string; TTL: number }[];
-        comment?: string;
+        local: { unavailable: boolean; values: unknown[]; error?: string };
+        doh: { status: number; dnssecAuthenticated: boolean; answers: { data: string; TTL: number }[]; comment?: string; unavailable: boolean };
       }[]) {
-        rawLines.push(`\n[${result.type}] Status=${result.status} DNSSEC_AD=${result.dnssecAuthenticated}`);
-        if (result.comment) rawLines.push(`Comment: ${result.comment}`);
-        if (!result.answers.length) {
-          rawLines.push('- No answer records');
-          items.push({ label: `${result.type} Records`, value: 'No answers', status: result.status === 0 ? 'warn' : 'fail' });
+        rawLines.push(`\n[${result.type}]`);
+        rawLines.push(`Local Resolver: ${result.local.unavailable ? result.local.error || 'Unavailable' : JSON.stringify(result.local.values)}`);
+        rawLines.push(`Google DoH: status=${result.doh.status} DNSSEC_AD=${result.doh.dnssecAuthenticated}${result.doh.comment ? ` comment=${result.doh.comment}` : ''}`);
+        if (!result.doh.answers.length) {
+          items.push({ label: `${result.type} Comparison`, value: 'No DoH answers', status: result.doh.unavailable ? 'fail' : 'warn' });
           continue;
         }
-
-        result.answers.forEach((answer) => {
+        result.doh.answers.forEach((answer) => {
           rawLines.push(`- ${answer.data} (TTL ${answer.TTL})`);
           items.push({
             label: `${result.type} Record`,
             value: `${answer.data} (TTL ${answer.TTL})`,
-            status: result.dnssecAuthenticated ? 'pass' : 'info',
+            status: result.doh.dnssecAuthenticated ? 'pass' : 'info',
           });
         });
       }
 
       return {
         success: true,
-        summary: `Google DoH resolved ${items.length} answer(s) for ${resData.hostname}`,
+        summary: `Resolver comparison returned ${items.length} answer item(s) for ${resData.hostname}${resData.partial ? ' (partial)' : ''}`,
         data: resData,
         rawOutput: rawLines.join('\n'),
-        explanation: 'This tool uses Google Public DNS over HTTPS. The DNSSEC AD flag indicates whether Google validated authenticated DNSSEC data for a response.',
+        explanation: 'This tool compares the local resolver with Google Public DNS over HTTPS. The DNSSEC AD flag indicates whether Google validated authenticated DNSSEC data for a response.',
         items,
       };
     } catch (err: unknown) {
@@ -278,6 +299,8 @@ export const whoisLookupTool: ToolDefinition = {
         { label: 'Registrar', value: resData.registrar || 'Not disclosed', status: 'info' as const },
         { label: 'Status', value: statuses.join(', ') || 'N/A', status: 'info' as const },
         { label: 'Port 43 WHOIS', value: resData.port43 || 'N/A', status: 'info' as const },
+        { label: 'Provider', value: resData.provider || 'Unknown', status: 'info' as const },
+        { label: 'Timestamp', value: resData.timestamp || 'N/A', status: 'info' as const },
       ];
 
       events.forEach((event) => {

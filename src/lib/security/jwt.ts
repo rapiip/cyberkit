@@ -216,7 +216,7 @@ export async function inspectJwt(token: string, options: JwtInspectionOptions = 
   const algorithm = header.alg;
   if (typeof algorithm !== 'string' || !algorithm) throw new Error('JWT header "alg" must be a non-empty string.');
 
-  const signature = base64UrlToBytes(signatureSegment, algorithm === 'none');
+  const signature = base64UrlToBytes(signatureSegment, true);
   const now = options.nowSeconds ?? Math.floor(Date.now() / 1000);
   const skew = Math.min(Math.max(options.clockSkewSeconds ?? 60, 0), 3600);
   const exp = numericClaim(payload, 'exp');

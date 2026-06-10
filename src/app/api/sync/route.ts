@@ -10,7 +10,9 @@ import {
 } from '@/lib/server/scanner';
 import {
   CLOUD_SYNC_FORMAT_VERSION,
+  isSyncEnvelopeExpired,
   isEncryptedSyncEnvelope,
+  syncEnvelopeExpiresAt,
   type EncryptedSyncEnvelope,
 } from '@/lib/security/cloud-sync';
 
@@ -90,16 +92,39 @@ export async function POST(request: Request) {
     if (rate.limited) return rateLimitResponse(rate.retryAfter);
 
     const stored = await redisCommand<string>(['GET', storageKey]);
-    if (!stored) return NextResponse.json({ success: true, found: false, envelope: null });
+    if (!stored) {
+      return NextResponse.json(
+        { success: true, found: false, expired: false, envelope: null },
+        { headers: { 'Cache-Control': 'private, no-store' } }
+      );
+    }
     const envelope = JSON.parse(stored) as unknown;
     if (!isEncryptedSyncEnvelope(envelope)) {
       return errorResponse('Stored Cloud Sync payload is invalid.', 500, 'SYNC_DATA_INVALID');
     }
-    const expiresAt = new Date(
-      Date.parse(envelope.timestamp) + retentionSeconds() * 1000
-    ).toISOString();
+    const ttlSeconds = retentionSeconds();
+    if (isSyncEnvelopeExpired(envelope, ttlSeconds)) {
+      return NextResponse.json(
+        {
+          success: true,
+          found: false,
+          expired: true,
+          envelope: null,
+          expiresAt: syncEnvelopeExpiresAt(envelope, ttlSeconds),
+          version: envelope.version,
+        },
+        { headers: { 'Cache-Control': 'private, no-store' } }
+      );
+    }
     return NextResponse.json(
-      { success: true, found: true, envelope, expiresAt },
+      {
+        success: true,
+        found: true,
+        expired: false,
+        envelope,
+        expiresAt: syncEnvelopeExpiresAt(envelope, ttlSeconds),
+        version: envelope.version,
+      },
       { headers: { 'Cache-Control': 'private, no-store' } }
     );
   } catch (error) {

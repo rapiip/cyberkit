@@ -1,72 +1,79 @@
 import type { ToolDefinition } from '../types';
-import { assertFile, asString, errorResult, MAX_FILE_BYTES } from '../validation';
+import {
+  extractIocsFromText,
+  LOCAL_ANALYSIS_MAX_FILE_BYTES,
+  triageFile,
+} from '@/lib/security/local-analysis';
+import { assertFile, optionalString } from '../validation';
+
+function triageSummaryItems(report: Awaited<ReturnType<typeof triageFile>>) {
+  return [
+    { label: 'Declared MIME', value: report.declaredMime, status: 'info' as const },
+    { label: 'Detected MIME', value: report.detectedMime, status: report.detectedMime === 'unknown' ? 'warn' as const : 'pass' as const },
+    { label: 'Extension', value: report.extension || 'none', status: 'info' as const },
+    { label: 'Detected Extension', value: report.detectedExtension, status: 'info' as const },
+    { label: 'Declared vs Magic', value: report.mimeMismatch ? 'Mismatch' : 'Consistent', status: report.mimeMismatch ? 'fail' as const : 'pass' as const },
+    { label: 'Extension vs Magic', value: report.extensionMismatch ? 'Mismatch' : 'Consistent', status: report.extensionMismatch ? 'fail' as const : 'pass' as const },
+    { label: 'SHA-256', value: report.hashes.sha256, status: 'info' as const },
+    { label: 'SHA-1', value: report.hashes.sha1, status: 'info' as const },
+    { label: 'MD5', value: report.hashes.md5, status: 'info' as const },
+    { label: 'Entropy', value: String(report.entropy), status: report.entropy > 5 ? 'warn' as const : 'info' as const },
+  ];
+}
 
 export const exifViewerTool: ToolDefinition = {
   id: 'exif-viewer', slug: 'exif-viewer', name: 'EXIF Metadata Viewer', category: 'forensics',
-  description: 'Extract and view EXIF metadata from image files including camera info, GPS, timestamps.',
-  shortDescription: 'Extract EXIF metadata from images',
+  description: 'Extract local file metadata, hashes, and EXIF details from images without uploading them.',
+  shortDescription: 'Extract EXIF and file metadata from images',
   tags: ['exif', 'metadata', 'image', 'gps', 'forensics'], difficulty: 'beginner', executionType: 'client', isFeatured: false,
-  inputs: [{ id: 'file', label: 'Image File', type: 'file', required: true }],
-  execute: async (inputs) => {
-    try {
-      const file = assertFile(inputs.file, 'Image file', MAX_FILE_BYTES);
-      if (file.size < 4) return { success: false, summary: 'File is too small to contain valid metadata', data: {}, rawOutput: 'Error: File is too small' };
-      
-      const buffer = await file.arrayBuffer();
-      const view = new DataView(buffer);
-      const items: { label: string; value: string; status: 'info' | 'warn' | 'pass' }[] = [
-        { label: 'File Name', value: file.name, status: 'info' },
-        { label: 'File Size', value: `${(file.size / 1024).toFixed(1)} KB`, status: 'info' },
-        { label: 'File Type', value: file.type || 'unknown', status: 'info' },
-        { label: 'Last Modified', value: new Date(file.lastModified).toISOString(), status: 'info' },
-      ];
-      if (view.byteLength >= 4 && view.getUint16(0) === 0xFFD8) {
-        items.push({ label: 'Format', value: 'JPEG', status: 'info' });
-        let offset = 2;
-        while (offset < buffer.byteLength - 4) {
-          const marker = view.getUint16(offset);
-          if (marker === 0xFFE1) { items.push({ label: 'EXIF Data', value: 'Found', status: 'pass' }); break; }
-          if ((marker & 0xFF00) !== 0xFF00) break;
-          offset += 2 + view.getUint16(offset + 2);
-        }
-      }
-      const sha = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', buffer))).map(b => b.toString(16).padStart(2, '0')).join('');
-      items.push({ label: 'SHA-256', value: sha, status: 'info' });
-      return { success: true, summary: `${file.name} — ${items.length} fields`, data: {}, rawOutput: items.map(i => `${i.label}: ${i.value}`).join('\n'), items };
-    } catch (error) {
-      return errorResult(error, 'Failed to read metadata');
-    }
+  persistHistory: false,
+  inputs: [{ id: 'file', label: 'Image File', type: 'file', required: true, helperText: 'Processed locally in your browser. Maximum 15 MB.' }],
+  execute: async (inputs, context) => {
+    const file = assertFile(inputs.file, 'Image file', LOCAL_ANALYSIS_MAX_FILE_BYTES);
+    context?.onProgress?.({ current: 1, total: 1, label: 'Reading image metadata' });
+    const report = await triageFile(file, context?.signal);
+    const metadataEntries = Object.entries(report.metadata);
+    return {
+      success: true,
+      summary: metadataEntries.length ? `${metadataEntries.length} metadata field(s) extracted` : 'No EXIF metadata found',
+      data: { report },
+      rawOutput: [
+        `File: ${report.fileName}`,
+        `Declared MIME: ${report.declaredMime}`,
+        `Detected MIME: ${report.detectedMime}`,
+        `SHA-256: ${report.hashes.sha256}`,
+        ...metadataEntries.map(([key, value]) => `${key}: ${String(value)}`),
+      ].join('\n'),
+      explanation: 'The file is processed locally. EXIF parsing uses exifr, type identification uses magic bytes, and hashes are derived in-browser.',
+      items: [
+        ...triageSummaryItems(report),
+        { label: 'Metadata Fields', value: String(metadataEntries.length), status: metadataEntries.length ? 'pass' as const : 'info' as const },
+      ],
+    };
   },
 
 };
 
 export const mimeCheckerTool: ToolDefinition = {
   id: 'mime-checker', slug: 'mime-checker', name: 'MIME Type Checker', category: 'forensics',
-  description: 'Check file MIME type based on content and extension. Detect mismatches.',
-  shortDescription: 'Check and verify file MIME types',
+  description: 'Compare extension, declared MIME type, and magic-byte detection for a local file.',
+  shortDescription: 'Check extension, MIME, and magic-byte consistency',
   tags: ['mime', 'type', 'file', 'forensics'], difficulty: 'beginner', executionType: 'client', isFeatured: false,
-  inputs: [{ id: 'file', label: 'File', type: 'file', required: true }],
-  execute: async (inputs) => {
-    const file = assertFile(inputs.file);
-    const buffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(buffer.slice(0, 16));
-    const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
-    const sigs: { m: number[]; t: string }[] = [
-      { m: [0xFF, 0xD8, 0xFF], t: 'image/jpeg' }, { m: [0x89, 0x50, 0x4E, 0x47], t: 'image/png' },
-      { m: [0x47, 0x49, 0x46], t: 'image/gif' }, { m: [0x25, 0x50, 0x44, 0x46], t: 'application/pdf' },
-      { m: [0x50, 0x4B, 0x03, 0x04], t: 'application/zip' }, { m: [0x1F, 0x8B], t: 'application/gzip' },
-      { m: [0x4D, 0x5A], t: 'application/x-msdos-executable' },
-    ];
-    let detected = 'unknown';
-    for (const s of sigs) { if (s.m.every((b, i) => bytes[i] === b)) { detected = s.t; break; } }
-    const mismatch = file.type && detected !== 'unknown' && !file.type.includes(detected.split('/')[1]);
+  persistHistory: false,
+  inputs: [{ id: 'file', label: 'File', type: 'file', required: true, helperText: 'Processed locally in your browser. Maximum 15 MB.' }],
+  execute: async (inputs, context) => {
+    const file = assertFile(inputs.file, 'File', LOCAL_ANALYSIS_MAX_FILE_BYTES);
+    context?.onProgress?.({ current: 1, total: 1, label: 'Analyzing file type' });
+    const report = await triageFile(file, context?.signal);
     return {
-      success: true, summary: `${detected}${mismatch ? ' ⚠ Mismatch!' : ''}`, data: { declared: file.type, detected }, rawOutput: `File: ${file.name}\nDeclared: ${file.type}\nDetected: ${detected}\nMagic: ${hex}`,
+      success: true,
+      summary: report.mimeMismatch || report.extensionMismatch ? 'Type mismatch detected' : 'Declared type matches file content',
+      data: { report },
+      rawOutput: `File: ${report.fileName}\nDeclared MIME: ${report.declaredMime}\nDetected MIME: ${report.detectedMime}\nExtension: ${report.extension || 'none'}\nDetected Extension: ${report.detectedExtension}\nMagic Bytes: ${report.magicBytes}`,
+      explanation: 'Detection compares the browser-declared MIME type, the filename extension, and magic-byte inspection via file-type. Mismatches often indicate renaming, malformed uploads, or masquerading content.',
       items: [
-        { label: 'Declared', value: file.type || 'none', status: 'info' },
-        { label: 'Detected', value: detected, status: detected === 'unknown' ? 'warn' : 'pass' },
-        { label: 'Magic Bytes', value: hex, status: 'info' },
-        { label: 'Mismatch', value: mismatch ? 'YES' : 'No', status: mismatch ? 'fail' : 'pass' },
+        ...triageSummaryItems(report),
+        { label: 'Magic Bytes', value: report.magicBytes, status: 'info' as const },
       ],
     };
   },
@@ -74,81 +81,110 @@ export const mimeCheckerTool: ToolDefinition = {
 
 export const magicBytesTool: ToolDefinition = {
   id: 'magic-bytes', slug: 'magic-bytes', name: 'Magic Bytes Viewer', category: 'forensics',
-  description: 'View hex dump of file header bytes to identify true file type.',
-  shortDescription: 'View file magic bytes', tags: ['magic', 'bytes', 'hex', 'forensics'],
+  description: 'Inspect local file headers together with detected type and integrity hashes.',
+  shortDescription: 'Inspect magic bytes and file signatures', tags: ['magic', 'bytes', 'hex', 'forensics'],
   difficulty: 'intermediate', executionType: 'client', isFeatured: false,
+  persistHistory: false,
   inputs: [
-    { id: 'file', label: 'File', type: 'file', required: true },
-    { id: 'byteCount', label: 'Bytes to Show', type: 'number', defaultValue: 64 },
+    { id: 'file', label: 'File', type: 'file', required: true, helperText: 'Processed locally in your browser. Maximum 15 MB.' },
   ],
-  execute: async (inputs) => {
-    const file = assertFile(inputs.file);
-    const count = Math.min(Math.max(Number(inputs.byteCount) || 64, 16), 512);
-    const bytes = new Uint8Array((await file.arrayBuffer()).slice(0, count));
-    const lines: string[] = [];
-    for (let i = 0; i < bytes.length; i += 16) {
-      const s = bytes.slice(i, i + 16);
-      const hex = Array.from(s).map(b => b.toString(16).padStart(2, '0')).join(' ');
-      const ascii = Array.from(s).map(b => b >= 32 && b <= 126 ? String.fromCharCode(b) : '.').join('');
-      lines.push(`${i.toString(16).padStart(8, '0')}  ${hex.padEnd(48)}  ${ascii}`);
-    }
-    return { success: true, summary: `First ${bytes.length} bytes`, data: {}, rawOutput: lines.join('\n') };
+  execute: async (inputs, context) => {
+    const file = assertFile(inputs.file, 'File', LOCAL_ANALYSIS_MAX_FILE_BYTES);
+    context?.onProgress?.({ current: 1, total: 1, label: 'Reading file signature' });
+    const report = await triageFile(file, context?.signal);
+    return {
+      success: true,
+      summary: `Magic bytes read for ${report.fileName}`,
+      data: { report },
+      rawOutput: `File: ${report.fileName}\nMagic Bytes: ${report.magicBytes}\nDetected MIME: ${report.detectedMime}\nDetected Extension: ${report.detectedExtension}\nSHA-256: ${report.hashes.sha256}`,
+      items: [
+        { label: 'Magic Bytes', value: report.magicBytes, status: 'info' as const },
+        { label: 'Detected MIME', value: report.detectedMime, status: report.detectedMime === 'unknown' ? 'warn' as const : 'pass' as const },
+        { label: 'Detected Extension', value: report.detectedExtension, status: 'info' as const },
+        { label: 'SHA-256', value: report.hashes.sha256, status: 'info' as const },
+      ],
+    };
   },
 };
 
 export const stringExtractorTool: ToolDefinition = {
   id: 'string-extractor', slug: 'string-extractor', name: 'String Extractor', category: 'forensics',
-  description: 'Extract readable ASCII strings from binary files, like Unix strings command.',
-  shortDescription: 'Extract strings from binary files',
+  description: 'Extract printable strings, embedded URLs, hashes, and other IOCs from local files.',
+  shortDescription: 'Extract strings and embedded IOCs from files',
   tags: ['strings', 'extract', 'binary', 'forensics'], difficulty: 'intermediate', executionType: 'client', isFeatured: false,
+  persistHistory: false,
   inputs: [
-    { id: 'file', label: 'File', type: 'file', required: true },
-    { id: 'minLength', label: 'Min String Length', type: 'number', defaultValue: 4 },
+    { id: 'file', label: 'File', type: 'file', required: true, helperText: 'Processed locally in your browser. Maximum 15 MB.' },
   ],
-  execute: async (inputs) => {
-    const file = assertFile(inputs.file);
-    const minLen = Math.max(Number(inputs.minLength) || 4, 2);
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const strings: string[] = [];
-    let cur = '';
-    for (const b of bytes) {
-      if (b >= 32 && b <= 126) cur += String.fromCharCode(b);
-      else { if (cur.length >= minLen) strings.push(cur); cur = ''; }
-    }
-    if (cur.length >= minLen) strings.push(cur);
-    return { success: true, summary: `Found ${strings.length} strings`, data: { total: strings.length }, rawOutput: strings.slice(0, 500).join('\n') };
+  execute: async (inputs, context) => {
+    const file = assertFile(inputs.file, 'File', LOCAL_ANALYSIS_MAX_FILE_BYTES);
+    context?.onProgress?.({ current: 1, total: 1, label: 'Extracting printable strings' });
+    const report = await triageFile(file, context?.signal);
+    return {
+      success: true,
+      summary: `Found ${report.printableStrings.length} printable string(s) and ${report.iocs.length} IOC candidate(s)`,
+      data: { report },
+      rawOutput: [
+        `File: ${report.fileName}`,
+        `Embedded URLs: ${report.embeddedUrls.length}`,
+        `IOC Candidates: ${report.iocs.length}`,
+        '',
+        ...report.printableStrings.slice(0, 120),
+      ].join('\n'),
+      explanation: 'Strings are extracted locally from printable ASCII ranges. The same local pass also surfaces embedded URLs and IOC candidates from strings and metadata.',
+      items: [
+        { label: 'Printable Strings', value: String(report.printableStrings.length), status: report.printableStrings.length ? 'info' as const : 'pass' as const },
+        { label: 'Embedded URLs', value: String(report.embeddedUrls.length), status: report.embeddedUrls.length ? 'warn' as const : 'pass' as const },
+        { label: 'IOC Candidates', value: String(report.iocs.length), status: report.iocs.length ? 'warn' as const : 'pass' as const },
+        { label: 'Entropy', value: String(report.entropy), status: report.entropy > 5 ? 'warn' as const : 'info' as const },
+      ],
+    };
   },
 };
 
 export const iocExtractorTool: ToolDefinition = {
   id: 'ioc-extractor', slug: 'ioc-extractor', name: 'IOC Extractor', category: 'forensics',
-  description: 'Extract Indicators of Compromise from text: IPs, domains, URLs, emails, hashes.',
-  shortDescription: 'Extract IOCs from text/logs',
+  description: 'Extract and validate local IOC candidates from text or files, including defanged IPs, domains, URLs, emails, and hashes.',
+  shortDescription: 'Extract and validate IOCs locally',
   tags: ['ioc', 'indicator', 'threat', 'ip', 'hash'], difficulty: 'intermediate', executionType: 'client', isFeatured: false,
-  inputs: [{ id: 'input', label: 'Text / Logs', type: 'textarea', placeholder: 'Paste logs or text...', required: true }],
-  execute: async (inputs) => {
-    const t = asString(inputs.input, 'Text / logs');
-    const ips = [...new Set(t.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) || [])];
-    const urls = [...new Set(t.match(/https?:\/\/[^\s<>"']+/g) || [])];
-    const emails = [...new Set(t.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [])];
-    const md5 = [...new Set(t.match(/\b[a-f0-9]{32}\b/gi) || [])];
-    const sha1 = [...new Set(t.match(/\b[a-f0-9]{40}\b/gi) || [])];
-    const sha256 = [...new Set(t.match(/\b[a-f0-9]{64}\b/gi) || [])];
-    const total = ips.length + urls.length + emails.length + md5.length + sha1.length + sha256.length;
-    const parts: string[] = [];
-    if (ips.length) parts.push(`IPs:\n${ips.join('\n')}`);
-    if (urls.length) parts.push(`URLs:\n${urls.join('\n')}`);
-    if (emails.length) parts.push(`Emails:\n${emails.join('\n')}`);
-    if (md5.length) parts.push(`MD5:\n${md5.join('\n')}`);
-    if (sha1.length) parts.push(`SHA-1:\n${sha1.join('\n')}`);
-    if (sha256.length) parts.push(`SHA-256:\n${sha256.join('\n')}`);
+  persistHistory: false,
+  inputs: [
+    { id: 'input', label: 'Text / Logs', type: 'textarea', placeholder: 'Paste logs, alert text, or decoded strings...' },
+    { id: 'file', label: 'Optional File', type: 'file', helperText: 'Optional local file. Strings and metadata are scanned locally without upload.' },
+    { id: 'enableEnrichment', label: 'Explicitly allow provider enrichment', type: 'checkbox', defaultValue: false, helperText: 'Disabled by default. This build performs local analysis only unless a provider is configured later.' },
+  ],
+  execute: async (inputs, context) => {
+    const pasted = optionalString(inputs.input).trim();
+    const file = inputs.file instanceof File ? assertFile(inputs.file, 'Optional file', LOCAL_ANALYSIS_MAX_FILE_BYTES) : null;
+    if (!pasted && !file) throw new Error('Provide text, a file, or both for IOC extraction.');
+
+    context?.onProgress?.({ current: 1, total: file ? 2 : 1, label: 'Extracting IOC candidates' });
+    const iocs = extractIocsFromText(pasted, 'pasted-input');
+    let fileReport = null;
+    if (file) {
+      context?.onProgress?.({ current: 2, total: 2, label: 'Analyzing file strings and metadata' });
+      fileReport = await triageFile(file, context?.signal);
+      for (const ioc of fileReport.iocs) iocs.push(ioc);
+    }
+
+    const deduped = Array.from(new Map(iocs.map((ioc) => [`${ioc.type}:${ioc.normalized.toLowerCase()}`, ioc])).values());
+    const validCount = deduped.filter((ioc) => ioc.valid).length;
+    const enrichmentRequested = Boolean(inputs.enableEnrichment);
     return {
-      success: true, summary: `${total} IOC(s) found`, data: { ips, urls, emails, md5, sha1, sha256 }, rawOutput: parts.join('\n\n') || 'No IOCs found',
+      success: true,
+      summary: `${deduped.length} IOC candidate(s), ${validCount} validated locally${enrichmentRequested ? '; provider enrichment not configured' : ''}`,
+      data: { iocs: deduped, fileReport, enrichmentRequested, enrichmentPerformed: false },
+      rawOutput: deduped.length
+        ? deduped.map((ioc) => `${ioc.type.toUpperCase()} [${ioc.confidence}] ${ioc.normalized}${ioc.defanged ? ' (defanged source)' : ''}`).join('\n')
+        : 'No IOCs found',
+      explanation: enrichmentRequested
+        ? 'Local extraction and validation completed. Provider enrichment was explicitly requested, but this build has no external enrichment provider configured, so no indicators left the browser.'
+        : 'IOC extraction and validation completed locally. No provider enrichment was requested or performed.',
       items: [
-        { label: 'IPs', value: `${ips.length}`, status: ips.length ? 'warn' : 'info' },
-        { label: 'URLs', value: `${urls.length}`, status: urls.length ? 'warn' : 'info' },
-        { label: 'Emails', value: `${emails.length}`, status: emails.length ? 'warn' : 'info' },
-        { label: 'Hashes', value: `${md5.length + sha1.length + sha256.length}`, status: (md5.length + sha1.length + sha256.length) ? 'warn' : 'info' },
+        { label: 'IOC Candidates', value: String(deduped.length), status: deduped.length ? 'warn' as const : 'pass' as const },
+        { label: 'Validated', value: String(validCount), status: validCount ? 'pass' as const : 'info' as const },
+        { label: 'Defanged Inputs', value: String(deduped.filter((ioc) => ioc.defanged).length), status: 'info' as const },
+        { label: 'Enrichment', value: enrichmentRequested ? 'Requested but not configured' : 'Local only', status: enrichmentRequested ? 'warn' as const : 'pass' as const },
       ],
     };
   },

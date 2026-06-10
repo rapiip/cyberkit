@@ -7,10 +7,13 @@ import {
   clientIpFromRequest,
   consumeRateLimit,
   fetchPublicHttp,
+  fetchPublicHttpWithRedirects,
   isPrivateIp,
   normalizeHostname,
   normalizeTargetUrl,
   PublicTargetError,
+  readJsonResponse,
+  readTextResponse,
 } from '../src/lib/server/scanner';
 
 test('normalizeHostname accepts domains and strips URL parts', () => {
@@ -119,4 +122,108 @@ test('fetchPublicHttp blocks redirects to private IP targets', async () => {
     dns.promises.lookup = originalLookup;
     http.request = originalRequest;
   }
+});
+
+test('fetchPublicHttpWithRedirects enforces redirect limits', async () => {
+  const originalLookup = dns.promises.lookup;
+  const originalRequest = http.request;
+
+  dns.promises.lookup = (async (hostname: string) => {
+    if (hostname === 'public.example') {
+      return [{ address: '93.184.216.34', family: 4 }];
+    }
+    return (originalLookup as (host: string, options: dns.LookupAllOptions) => Promise<dns.LookupAddress[]>)(
+      hostname,
+      { all: true, verbatim: true }
+    );
+  }) as unknown as typeof dns.promises.lookup;
+
+  http.request = ((options: http.RequestOptions, callback?: (res: http.IncomingMessage) => void) => {
+    const request = new EventEmitter() as http.ClientRequest;
+    request.write = (() => true) as http.ClientRequest['write'];
+    request.end = (() => {
+      const response = new EventEmitter() as http.IncomingMessage;
+      response.statusCode = 302;
+      response.statusMessage = 'Found';
+      response.headers = { location: '/next-hop' };
+      process.nextTick(() => {
+        callback?.(response);
+        response.emit('end');
+      });
+      return request;
+    }) as http.ClientRequest['end'];
+    request.destroy = (() => request) as http.ClientRequest['destroy'];
+    request.setTimeout = (() => request) as http.ClientRequest['setTimeout'];
+    return request;
+  }) as typeof http.request;
+
+  try {
+    await assert.rejects(
+      fetchPublicHttpWithRedirects(new URL('http://public.example/start'), {}, 5_000, 1),
+      (error: unknown) =>
+        error instanceof PublicTargetError &&
+        error.code === 'TOO_MANY_REDIRECTS'
+    );
+  } finally {
+    dns.promises.lookup = originalLookup;
+    http.request = originalRequest;
+  }
+});
+
+test('readJsonResponse rejects unexpected content types', async () => {
+  const response = new Response('<html>not json</html>', {
+    headers: { 'Content-Type': 'text/html' },
+  });
+
+  await assert.rejects(
+    readJsonResponse(response),
+    (error: unknown) =>
+      error instanceof PublicTargetError &&
+      error.code === 'UNEXPECTED_CONTENT_TYPE'
+  );
+});
+
+test('readJsonResponse rejects oversized provider payloads', async () => {
+  const response = new Response(`{"blob":"${'a'.repeat(2048)}"}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': '2059',
+    },
+  });
+
+  await assert.rejects(
+    readJsonResponse(response, { limitBytes: 256 }),
+    (error: unknown) =>
+      error instanceof PublicTargetError &&
+      error.code === 'RESPONSE_TOO_LARGE'
+  );
+});
+
+test('readTextResponse rejects unexpected content types', async () => {
+  const response = new Response('PK\x03\x04', {
+    headers: { 'Content-Type': 'application/octet-stream' },
+  });
+
+  await assert.rejects(
+    readTextResponse(response, { allowedContentTypes: [/text\/plain/i] }),
+    (error: unknown) =>
+      error instanceof PublicTargetError &&
+      error.code === 'UNEXPECTED_CONTENT_TYPE'
+  );
+});
+
+test('readTextResponse rejects oversized decompressed bodies', async () => {
+  const response = new Response('A'.repeat(2048), {
+    headers: {
+      'Content-Type': 'text/plain',
+      'Content-Length': '2048',
+    },
+  });
+
+  await assert.rejects(
+    readTextResponse(response, { allowedContentTypes: [/text\/plain/i], limitBytes: 256 }),
+    (error: unknown) =>
+      error instanceof PublicTargetError &&
+      error.code === 'RESPONSE_TOO_LARGE'
+  );
 });

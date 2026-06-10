@@ -9,6 +9,21 @@ export interface EncryptedSyncEnvelope {
   timestamp: string;
 }
 
+export function syncEnvelopeExpiresAt(
+  envelope: EncryptedSyncEnvelope,
+  retentionSeconds: number
+): string {
+  return new Date(Date.parse(envelope.timestamp) + retentionSeconds * 1000).toISOString();
+}
+
+export function isSyncEnvelopeExpired(
+  envelope: EncryptedSyncEnvelope,
+  retentionSeconds: number,
+  nowMs = Date.now()
+): boolean {
+  return Date.parse(syncEnvelopeExpiresAt(envelope, retentionSeconds)) <= nowMs;
+}
+
 export class CloudSyncDecryptionError extends Error {
   code = 'WRONG_PASSPHRASE_OR_CORRUPT_DATA';
 
@@ -144,7 +159,12 @@ export async function decryptSyncData<T>(
       key,
       toArrayBuffer(base64ToBytes(envelope.ciphertext))
     );
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(plaintext)) as T;
+    const plaintextBytes = new Uint8Array(plaintext);
+    try {
+      return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(plaintextBytes)) as T;
+    } finally {
+      plaintextBytes.fill(0);
+    }
   } catch (error) {
     if (error instanceof Error && error.message === 'Sync passphrase must be 16-256 characters.') throw error;
     throw new CloudSyncDecryptionError();

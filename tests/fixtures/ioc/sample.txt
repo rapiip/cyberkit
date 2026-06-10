@@ -1,0 +1,2 @@
+Visit hxxps://evil[.]example/path and contact ops[@]example[.]com.
+Observed 8.8.8.8 and hash d41d8cd98f00b204e9800998ecf8427e in the payload.

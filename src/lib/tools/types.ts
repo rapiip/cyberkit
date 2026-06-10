@@ -36,6 +36,18 @@ export interface ToolInput {
   defaultValue?: string | number | boolean;
   options?: { label: string; value: string }[];
   helperText?: string;
+  multiple?: boolean;
+}
+
+export interface ToolExecutionProgress {
+  current: number;
+  total: number;
+  label: string;
+}
+
+export interface ToolExecutionContext {
+  signal?: AbortSignal;
+  onProgress?: (progress: ToolExecutionProgress) => void;
 }
 
 export interface Finding {
@@ -89,11 +101,11 @@ export interface ToolDefinition {
   isFeatured: boolean;
   inputs: ToolInput[];
   persistHistory?: boolean;
-  execute: (inputs: Record<string, unknown>) => Promise<ToolResultInput>;
+  execute: (inputs: Record<string, unknown>, context?: ToolExecutionContext) => Promise<ToolResultInput>;
 }
 
 export interface LoadedToolDefinition extends Omit<ToolDefinition, 'execute'> {
-  execute: (inputs: Record<string, unknown>) => Promise<ToolResult>;
+  execute: (inputs: Record<string, unknown>, context?: ToolExecutionContext) => Promise<ToolResult>;
 }
 
 export interface ToolProvider {

@@ -19,6 +19,11 @@ export function assertFile(value: unknown, label = 'File', maxBytes = MAX_FILE_B
   return value;
 }
 
+export function assertFiles(value: unknown, label = 'Files', maxBytes = MAX_FILE_BYTES) {
+  if (!Array.isArray(value) || value.length === 0) throw new Error(`${label} are required`);
+  return value.map((item, index) => assertFile(item, `${label} item ${index + 1}`, maxBytes));
+}
+
 export function errorResult(error: unknown, fallback = 'Tool execution failed') {
   const message = error instanceof Error ? error.message : fallback;
   return { success: false, summary: message, data: {}, rawOutput: `Error: ${message}` };

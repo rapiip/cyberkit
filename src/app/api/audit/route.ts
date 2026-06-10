@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
 import dns from 'dns';
 import tls from 'tls';
+import type { Finding } from '@/lib/tools/types';
 import {
   consumeRateLimit,
   errorResponse,
-  fetchPublicHttp,
+  fetchPublicHttpWithRedirects,
   getHeaderValues,
   jsonError,
   normalizeTargetUrl,
+  OUTBOUND_LIMITS,
   parseJsonBody,
   rateLimitResponse,
+  readTextResponse,
   resolveAndBlockPrivateIp,
   TIMEOUTS,
 } from '@/lib/server/scanner';
@@ -17,6 +20,8 @@ import {
 const dnsPromises = dns.promises;
 
 type CheckStatus = 'pass' | 'warn' | 'fail' | 'error';
+type Severity = Finding['severity'];
+type Confidence = Finding['confidence'];
 
 interface AuditCheck {
   name: string;
@@ -25,143 +30,31 @@ interface AuditCheck {
   details: string;
 }
 
-interface DnsAuditResult {
-  success: boolean;
-  ip?: string;
-  recordsCount?: number;
-  error?: string;
+interface AuditFinding extends Finding {
+  weight: number;
 }
 
-interface SslAuditResult {
-  success: boolean;
-  issuer?: string;
-  validTo?: string;
-  isExpired?: boolean;
-  authorized?: boolean;
-  authorizationError?: string | null;
-  error?: string;
+interface BaselineInput {
+  score?: number;
+  findings?: Array<{ id?: string; severity?: string }>;
 }
 
-interface WebAuditResult {
-  success: boolean;
-  status?: number;
-  headers?: Record<string, string>;
-  setCookies?: string[];
-  error?: string;
-}
-
-interface FilesAuditResult {
-  robotsFound: boolean;
-  securityFound: boolean;
-}
-
-function certField(value: string | string[] | undefined) {
-  if (Array.isArray(value)) return value.join(', ');
-  return value;
-}
-
-async function checkDNS(hostname: string): Promise<DnsAuditResult> {
-  try {
-    const addresses = await dnsPromises.resolve4(hostname);
-    return {
-      success: true,
-      ip: addresses[0] || 'N/A',
-      recordsCount: addresses.length,
-    };
-  } catch {
-    return { success: false, error: 'DNS resolution failed' };
-  }
-}
-
-async function checkSSL(hostname: string, isHttps: boolean): Promise<SslAuditResult> {
-  if (!isHttps) return Promise.resolve({ success: false, error: 'Not using HTTPS' });
-
-  const [address] = await resolveAndBlockPrivateIp(hostname);
-  return new Promise((resolve) => {
-    const socket = tls.connect(
-      {
-        host: address,
-        port: 443,
-        servername: hostname,
-        rejectUnauthorized: false,
-      },
-      () => {
-        const cert = socket.getPeerCertificate(true);
-        const authorized = socket.authorized;
-        const authorizationError = socket.authorizationError ? String(socket.authorizationError) : null;
-        socket.destroy();
-
-        if (!cert || Object.keys(cert).length === 0) {
-          resolve({ success: false, error: 'No certificate returned' });
-          return;
-        }
-
-        const validTo = cert.valid_to ? new Date(cert.valid_to) : null;
-        const isExpired = validTo ? validTo.getTime() < Date.now() : true;
-        resolve({
-          success: !isExpired && authorized,
-          issuer: certField(cert.issuer?.O) || certField(cert.issuer?.CN) || 'Unknown',
-          validTo: validTo?.toISOString(),
-          isExpired,
-          authorized,
-          authorizationError,
-        });
-      }
-    );
-
-    socket.setTimeout(TIMEOUTS.tlsMs);
-    socket.on('timeout', () => {
-      socket.destroy();
-      resolve({ success: false, error: 'SSL connection timeout' });
-    });
-    socket.on('error', () => {
-      socket.destroy();
-      resolve({ success: false, error: 'SSL handshake error' });
-    });
-  });
-}
-
-async function checkWebHeaders(targetUrl: URL): Promise<WebAuditResult> {
-  try {
-    const response = await fetchPublicHttp(
-      targetUrl,
-      {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'CyberKitSecurityAuditAnalyzer/1.0',
-        },
-      },
-      TIMEOUTS.httpMs
-    );
-
-    const headers: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      headers[key.toLowerCase()] = value;
-    });
-
-    return { success: true, status: response.status, headers, setCookies: getHeaderValues(response.headers, 'set-cookie') };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Fetch failed';
-    return { success: false, error: message };
-  }
-}
-
-async function checkFiles(targetUrl: URL): Promise<FilesAuditResult> {
-  const base = `${targetUrl.protocol}//${targetUrl.host}`;
-  const [robotsRes, securityRes] = await Promise.allSettled([
-    fetchPublicHttp(new URL('/robots.txt', base), { headers: { 'User-Agent': 'CyberKitAudit/1.0' } }, TIMEOUTS.httpMs),
-    fetchPublicHttp(new URL('/.well-known/security.txt', base), { headers: { 'User-Agent': 'CyberKitAudit/1.0' } }, TIMEOUTS.httpMs),
-  ]);
-
-  return {
-    robotsFound: robotsRes.status === 'fulfilled' && robotsRes.value.status === 200,
-    securityFound: securityRes.status === 'fulfilled' && securityRes.value.status === 200,
-  };
-}
-
-function resultOrFallback<T>(result: PromiseSettledResult<T>, fallback: T) {
-  return result.status === 'fulfilled' ? result.value : fallback;
-}
+const SCORE_WEIGHTS = {
+  https: 10,
+  tls: 12,
+  hsts: 8,
+  csp: 10,
+  clickjacking: 6,
+  nosniff: 6,
+  referrerPolicy: 4,
+  permissionsPolicy: 4,
+  crossOriginIsolation: 8,
+  cors: 8,
+  cookies: 8,
+  securityTxt: 6,
+  robots: 4,
+  mixedContent: 6,
+} as const;
 
 function scoreToGrade(score: number) {
   if (score >= 90) return 'A';
@@ -171,9 +64,218 @@ function scoreToGrade(score: number) {
   return 'F';
 }
 
+function makeFinding(
+  id: string,
+  title: string,
+  severity: Severity,
+  confidence: Confidence,
+  evidence: string,
+  remediation: string,
+  source: string,
+  references: string[],
+  weight: number
+): AuditFinding {
+  return { id, title, severity, confidence, evidence, remediation, source, references, weight };
+}
+
+function certField(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value.join(', ');
+  return value;
+}
+
+function cookieFlags(cookie: string) {
+  return {
+    secure: /;\s*secure\b/i.test(cookie),
+    httpOnly: /;\s*httponly\b/i.test(cookie),
+    sameSite: /;\s*samesite=(strict|lax|none)\b/i.exec(cookie)?.[1]?.toLowerCase() ?? null,
+  };
+}
+
+function settledValues(result: PromiseSettledResult<string[]>) {
+  return result.status === 'fulfilled' ? result.value : [];
+}
+
+async function checkDns(hostname: string) {
+  try {
+    const [a, aaaa] = await Promise.allSettled([
+      dnsPromises.resolve4(hostname),
+      dnsPromises.resolve6(hostname),
+    ]);
+    const addresses = [
+      ...settledValues(a),
+      ...settledValues(aaaa),
+    ];
+    return { success: addresses.length > 0, addresses };
+  } catch {
+    return { success: false, addresses: [] as string[] };
+  }
+}
+
+async function checkTls(hostname: string, isHttps: boolean) {
+  if (!isHttps) return { success: false, error: 'Not using HTTPS' };
+  const [address] = await resolveAndBlockPrivateIp(hostname);
+  return new Promise<{
+    success: boolean;
+    error?: string;
+    protocol?: string;
+    cipher?: { name?: string; version?: string; standardName?: string };
+    validTo?: string;
+    issuer?: string;
+    subject?: string;
+    authorized?: boolean;
+    authorizationError?: string | null;
+    certificateChain?: string[];
+  }>((resolve) => {
+    const socket = tls.connect(
+      {
+        host: address,
+        port: 443,
+        servername: hostname,
+        rejectUnauthorized: false,
+      },
+      () => {
+        const cert = socket.getPeerCertificate(true);
+        const cipher = socket.getCipher();
+        const protocol = socket.getProtocol();
+        const authorized = socket.authorized;
+        const authorizationError = socket.authorizationError ? String(socket.authorizationError) : null;
+        const chain: string[] = [];
+        let current = cert;
+        let depth = 0;
+        while (current && Object.keys(current).length && depth < 6) {
+          chain.push(certField(current.subject?.CN) || certField(current.subject?.O) || `certificate-${depth + 1}`);
+          if (!current.issuerCertificate || current.issuerCertificate === current) break;
+          current = current.issuerCertificate;
+          depth += 1;
+        }
+        socket.destroy();
+        if (!cert || Object.keys(cert).length === 0) {
+          resolve({ success: false, error: 'No certificate returned' });
+          return;
+        }
+        resolve({
+          success: Boolean(authorized && protocol),
+          protocol: protocol || '',
+          cipher,
+          validTo: cert.valid_to ? new Date(cert.valid_to).toISOString() : '',
+          issuer: certField(cert.issuer?.O) || certField(cert.issuer?.CN) || 'Unknown issuer',
+          subject: certField(cert.subject?.CN) || certField(cert.subject?.O) || hostname,
+          authorized,
+          authorizationError,
+          certificateChain: chain,
+        });
+      }
+    );
+    socket.setTimeout(TIMEOUTS.tlsMs);
+    socket.on('timeout', () => {
+      socket.destroy();
+      resolve({ success: false, error: 'TLS connection timeout' });
+    });
+    socket.on('error', () => {
+      socket.destroy();
+      resolve({ success: false, error: 'TLS handshake failed' });
+    });
+  });
+}
+
+async function fetchWebSnapshot(targetUrl: URL) {
+  try {
+    const { response, redirectChain, finalUrl } = await fetchPublicHttpWithRedirects(
+      targetUrl,
+      {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'CyberKitSecurityAuditAnalyzer/1.0',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      },
+      TIMEOUTS.httpMs,
+      OUTBOUND_LIMITS.maxRedirects
+    );
+    const headers: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      headers[key.toLowerCase()] = value;
+    });
+    const contentType = response.headers.get('content-type');
+    const body = contentType && /text\/html|application\/xhtml\+xml/i.test(contentType)
+      ? await readTextResponse(response, {
+          allowedContentTypes: [/text\/html/i, /application\/xhtml\+xml/i],
+          limitBytes: 200 * 1024,
+        }).catch(() => '')
+      : '';
+    return {
+      success: true,
+      status: response.status,
+      headers,
+      body,
+      finalUrl: finalUrl.toString(),
+      redirectChain,
+      setCookies: getHeaderValues(response.headers, 'set-cookie'),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'HTTP fetch failed',
+      status: 0,
+      headers: {} as Record<string, string>,
+      body: '',
+      finalUrl: targetUrl.toString(),
+      redirectChain: [] as Array<{ url: string; status: number; location?: string }>,
+      setCookies: [] as string[],
+    };
+  }
+}
+
+async function checkSupportFiles(targetUrl: URL) {
+  const origin = `${targetUrl.protocol}//${targetUrl.host}`;
+  const checks = [
+    { key: 'robots', url: new URL('/robots.txt', origin) },
+    { key: 'security', url: new URL('/.well-known/security.txt', origin) },
+  ] as const;
+  const settled = await Promise.allSettled(
+    checks.map(async (item) => {
+      const { response } = await fetchPublicHttpWithRedirects(
+        item.url,
+        { headers: { 'User-Agent': 'CyberKitAudit/1.0', Accept: 'text/plain,*/*;q=0.1' } },
+        TIMEOUTS.httpMs
+      );
+      const text = response.ok
+        ? await readTextResponse(response, { allowedContentTypes: [/text\/plain/i, /text\//i], limitBytes: 64 * 1024 })
+        : '';
+      return { key: item.key, status: response.status, text };
+    })
+  );
+  const map = Object.fromEntries(
+    settled.map((result, index) => {
+      const fallback = { key: checks[index].key, status: 0, text: '' };
+      return [
+        checks[index].key,
+        result.status === 'fulfilled' ? result.value : fallback,
+      ];
+    })
+  ) as Record<'robots' | 'security', { key: string; status: number; text: string }>;
+  return map;
+}
+
+function compareWithBaseline(score: number, findings: AuditFinding[], baseline?: BaselineInput) {
+  if (!baseline) return null;
+  const previousIds = new Set((baseline.findings || []).map((item) => item.id).filter((value): value is string => Boolean(value)));
+  const currentIds = new Set(findings.map((finding) => finding.id));
+  const introduced = findings.filter((finding) => !previousIds.has(finding.id));
+  const resolved = (baseline.findings || []).filter((finding) => finding.id && !currentIds.has(finding.id));
+  return {
+    scoreDelta: score - (baseline.score ?? 0),
+    introducedCount: introduced.length,
+    resolvedCount: resolved.length,
+    regression: introduced.some((finding) => ['critical', 'high'].includes(finding.severity)),
+    introduced,
+    resolved,
+  };
+}
+
 export async function POST(request: Request) {
   try {
-    const body = await parseJsonBody<{ url?: unknown }>(request);
+    const body = await parseJsonBody<{ url?: unknown; baseline?: unknown }>(request);
     if (typeof body.url !== 'string' || !body.url.trim()) {
       return errorResponse('Invalid URL provided', 400, 'INVALID_URL');
     }
@@ -182,6 +284,7 @@ export async function POST(request: Request) {
     await resolveAndBlockPrivateIp(targetUrl.hostname);
     const hostname = targetUrl.hostname;
     const isHttps = targetUrl.protocol === 'https:';
+    const baseline = body.baseline && typeof body.baseline === 'object' ? body.baseline as BaselineInput : undefined;
 
     const rate = await consumeRateLimit(request, hostname, {
       endpoint: 'audit',
@@ -192,170 +295,391 @@ export async function POST(request: Request) {
     });
     if (rate.limited) return rateLimitResponse(rate.retryAfter);
 
-    const [dnsSettled, sslSettled, webSettled, filesSettled] = await Promise.allSettled([
-      checkDNS(hostname),
-      checkSSL(hostname, isHttps),
-      checkWebHeaders(targetUrl),
-      checkFiles(targetUrl),
+    const [dnsResult, tlsResult, webResult, fileResults] = await Promise.all([
+      checkDns(hostname),
+      checkTls(hostname, isHttps),
+      fetchWebSnapshot(targetUrl),
+      checkSupportFiles(targetUrl),
     ]);
 
-    const dnsResult = resultOrFallback<DnsAuditResult>(dnsSettled, { success: false, error: 'DNS checker failed' });
-    const sslResult = resultOrFallback<SslAuditResult>(sslSettled, { success: false, error: 'SSL checker failed' });
-    const webResult = resultOrFallback<WebAuditResult>(webSettled, { success: false, error: 'Header checker failed' });
-    const filesResult = resultOrFallback<FilesAuditResult>(filesSettled, { robotsFound: false, securityFound: false });
-
+    const findings: AuditFinding[] = [];
+    const headers = webResult.headers || {};
     const checks: AuditCheck[] = [];
-    let score = 0;
 
-    if (dnsResult.success) {
-      checks.push({
-        name: 'URL Validation',
-        status: 'pass',
-        message: `Valid hostname resolved to IP: ${dnsResult.ip}`,
-        details: `Domain: ${hostname}`,
-      });
-      score += 10;
-    } else {
-      checks.push({
-        name: 'URL Validation',
-        status: 'fail',
-        message: 'Could not resolve domain name via DNS',
-        details: 'Verify if the domain name is active and spelled correctly.',
-      });
+    if (!dnsResult.success) {
+      findings.push(
+        makeFinding(
+          'dns-resolution-failed',
+          'Hostname did not resolve publicly',
+          'critical',
+          'high',
+          `No public A or AAAA record was resolved for ${hostname}.`,
+          'Verify the hostname, DNS publication, and availability before re-running the audit.',
+          'DNS resolution',
+          ['https://www.rfc-editor.org/rfc/rfc1034'],
+          0
+        )
+      );
     }
 
-    if (isHttps) {
-      checks.push({
-        name: 'HTTPS Check',
-        status: 'pass',
-        message: 'HTTPS is enforced.',
-        details: 'Traffic is encrypted in transit.',
-      });
-      score += 10;
-    } else {
-      checks.push({
-        name: 'HTTPS Check',
-        status: 'fail',
-        message: 'Not using HTTPS.',
-        details: 'Critical: site transmits data over unencrypted HTTP protocol.',
-      });
+    if (!isHttps) {
+      findings.push(
+        makeFinding(
+          'https-missing',
+          'HTTPS is not enforced',
+          'critical',
+          'high',
+          `The requested URL uses ${targetUrl.protocol}.`,
+          'Redirect all browser traffic to HTTPS and preload HSTS once the HTTPS configuration is stable.',
+          targetUrl.toString(),
+          ['https://developer.mozilla.org/docs/Web/HTTP/Headers/Strict-Transport-Security'],
+          SCORE_WEIGHTS.https
+        )
+      );
     }
 
-    if (isHttps && sslResult.success) {
-      checks.push({
-        name: 'SSL/TLS Certificate',
-        status: 'pass',
-        message: `Valid certificate issued by: ${sslResult.issuer}`,
-        details: sslResult.validTo ? `Expires: ${new Date(sslResult.validTo).toLocaleDateString()}` : 'Expiration unavailable',
-      });
-      score += 10;
-    } else {
-      checks.push({
-        name: 'SSL/TLS Certificate',
-        status: 'fail',
-        message: `SSL Certificate Issue: ${sslResult.error || sslResult.authorizationError || 'Expired or invalid certificate'}`,
-        details: sslResult.authorized === false
-          ? 'Certificate trust chain validation failed.'
-          : 'Browsers may display security warnings to users.',
-      });
+    if (isHttps && !tlsResult.success) {
+      findings.push(
+        makeFinding(
+          'tls-invalid',
+          'TLS handshake or certificate validation failed',
+          'high',
+          'high',
+          tlsResult.error || tlsResult.authorizationError || 'TLS session was not authorized.',
+          'Serve a valid certificate chain, modern TLS configuration, and strong ciphers.',
+          hostname,
+          ['https://owasp.org/www-project-web-security-testing-guide/'],
+          SCORE_WEIGHTS.tls
+        )
+      );
     }
 
-    const hdrs = webResult.headers || {};
-    if (webResult.success) {
-      if (hdrs['content-security-policy']) {
-        checks.push({ name: 'Content Security Policy (CSP)', status: 'pass', message: 'CSP header detected.', details: hdrs['content-security-policy'].slice(0, 100) });
-        score += 15;
-      } else {
-        checks.push({ name: 'Content Security Policy (CSP)', status: 'warn', message: 'CSP header is missing.', details: 'Helps prevent Cross-Site Scripting attacks.' });
-      }
-
-      if (hdrs['strict-transport-security']) {
-        checks.push({ name: 'HSTS Check', status: 'pass', message: 'HSTS header is present.', details: hdrs['strict-transport-security'] });
-        score += 10;
-      } else {
-        checks.push({ name: 'HSTS Check', status: 'warn', message: 'Strict-Transport-Security is missing.', details: 'HSTS guarantees that connections are made only over HTTPS.' });
-      }
-
-      if (hdrs['x-frame-options']) {
-        checks.push({ name: 'X-Frame-Options', status: 'pass', message: `Header active: ${hdrs['x-frame-options']}`, details: 'Protects against clickjacking.' });
-        score += 10;
-      } else {
-        checks.push({ name: 'X-Frame-Options', status: 'fail', message: 'X-Frame-Options is missing.', details: 'The page can be embedded in iframe overlays.' });
-      }
-
-      if (hdrs['x-content-type-options']) {
-        checks.push({ name: 'X-Content-Type-Options', status: 'pass', message: 'Header active: nosniff', details: 'Prevents MIME-type sniffing.' });
-        score += 10;
-      } else {
-        checks.push({ name: 'X-Content-Type-Options', status: 'warn', message: 'X-Content-Type-Options is missing.', details: 'Allows browsers to interpret files differently from declared type.' });
-      }
-
-      if (hdrs['referrer-policy']) {
-        checks.push({ name: 'Referrer Policy', status: 'pass', message: `Referrer policy set to: ${hdrs['referrer-policy']}`, details: 'Restricts leakage of referrer URLs.' });
-        score += 10;
-      } else {
-        checks.push({ name: 'Referrer Policy', status: 'warn', message: 'Referrer-Policy is missing.', details: 'May leak sensitive path parameters in referrals.' });
-      }
-
-      const corsOrigin = hdrs['access-control-allow-origin'];
-      const corsCreds = hdrs['access-control-allow-credentials'];
-      if (corsOrigin === '*' && corsCreds === 'true') {
-        checks.push({ name: 'CORS Policy Check', status: 'fail', message: 'Highly permissive CORS configuration detected.', details: 'Wildcard origin with credentials enabled is unsafe.' });
-      } else if (corsOrigin === '*') {
-        checks.push({ name: 'CORS Policy Check', status: 'warn', message: 'CORS allowed from all origins (*).', details: 'Safe if public, but risky for authenticated endpoints.' });
-        score += 5;
-      } else if (corsOrigin) {
-        checks.push({ name: 'CORS Policy Check', status: 'pass', message: `CORS restricted to: ${corsOrigin}`, details: 'Safe origin isolation.' });
-        score += 10;
-      } else {
-        checks.push({ name: 'CORS Policy Check', status: 'pass', message: 'No permissive CORS headers detected.', details: 'Default secure browser cross-origin blocking applies.' });
-        score += 10;
-      }
-
-      const setCookies = webResult.setCookies || getHeaderValues(new Headers(hdrs), 'set-cookie');
-      const insecureCookies = setCookies.filter((cookie) => !/httponly/i.test(cookie) || !/secure/i.test(cookie));
-      if (insecureCookies.length > 0) {
-        checks.push({ name: 'Cookie Security Check', status: 'warn', message: 'Cookies issued lack HttpOnly or Secure attributes.', details: 'XSS can read cookies without HttpOnly; network attackers can steal cookies without Secure.' });
-      } else {
-        checks.push({ name: 'Cookie Security Check', status: 'pass', message: setCookies.length ? 'Session cookies use Secure and HttpOnly attributes.' : 'No session cookies set during audit request.', details: 'Cookie exposure risk is low for this request.' });
-        score += 5;
-      }
-    } else {
-      ['Content Security Policy (CSP)', 'HSTS Check', 'X-Frame-Options', 'X-Content-Type-Options', 'Referrer Policy', 'CORS Policy Check', 'Cookie Security Check'].forEach((name) => {
-        checks.push({
-          name,
-          status: 'error',
-          message: `Headers scan failed: ${webResult.error || 'Server unreachable'}`,
-          details: 'Audit checker could not connect to resolve HTTP headers.',
-        });
-      });
+    if (tlsResult.success && tlsResult.protocol && !/^TLSv1\.[23]$/.test(tlsResult.protocol)) {
+      findings.push(
+        makeFinding(
+          'tls-legacy-protocol',
+          'Legacy TLS protocol detected',
+          'medium',
+          'medium',
+          `Negotiated protocol: ${tlsResult.protocol}.`,
+          'Disable legacy TLS versions and prefer TLS 1.3 or TLS 1.2 with modern cipher suites.',
+          hostname,
+          ['https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html'],
+          Math.round(SCORE_WEIGHTS.tls / 2)
+        )
+      );
     }
 
-    if (filesResult.robotsFound || filesResult.securityFound) {
-      score += 5;
-      checks.push({
-        name: 'robots.txt presence',
-        status: 'pass',
-        message: `robots.txt detected: ${filesResult.robotsFound ? 'Yes' : 'No'} | security.txt: ${filesResult.securityFound ? 'Yes' : 'No'}`,
-        details: 'Assists indexing bots and security researchers.',
-      });
-    } else {
-      checks.push({
-        name: 'robots.txt presence',
-        status: 'warn',
-        message: 'Neither robots.txt nor security.txt was found.',
-        details: 'Recommended for standard search index and security reporting.',
-      });
+    if (!headers['content-security-policy']) {
+      findings.push(
+        makeFinding(
+          'csp-missing',
+          'Content-Security-Policy header is missing',
+          'high',
+          'high',
+          'No Content-Security-Policy header was returned in the main response.',
+          'Deploy a restrictive CSP that removes inline script execution and narrows allowed origins.',
+          webResult.finalUrl,
+          ['https://developer.mozilla.org/docs/Web/HTTP/CSP'],
+          SCORE_WEIGHTS.csp
+        )
+      );
     }
 
-    const finalScore = Math.min(100, score);
+    if (!headers['strict-transport-security']) {
+      findings.push(
+        makeFinding(
+          'hsts-missing',
+          'Strict-Transport-Security header is missing',
+          'medium',
+          'high',
+          'No HSTS header was returned on the HTTPS response.',
+          'Send Strict-Transport-Security with an appropriate max-age and includeSubDomains when safe.',
+          webResult.finalUrl,
+          ['https://developer.mozilla.org/docs/Web/HTTP/Headers/Strict-Transport-Security'],
+          SCORE_WEIGHTS.hsts
+        )
+      );
+    }
+
+    if (!headers['x-frame-options'] && !/frame-ancestors/i.test(headers['content-security-policy'] || '')) {
+      findings.push(
+        makeFinding(
+          'clickjacking-protection-missing',
+          'Clickjacking protection is missing',
+          'medium',
+          'high',
+          'Neither X-Frame-Options nor CSP frame-ancestors was present.',
+          'Set X-Frame-Options or frame-ancestors in CSP to restrict framing.',
+          webResult.finalUrl,
+          ['https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Frame-Options'],
+          SCORE_WEIGHTS.clickjacking
+        )
+      );
+    }
+
+    if (!headers['x-content-type-options']) {
+      findings.push(
+        makeFinding(
+          'nosniff-missing',
+          'X-Content-Type-Options header is missing',
+          'medium',
+          'high',
+          'The response did not include X-Content-Type-Options: nosniff.',
+          'Send X-Content-Type-Options: nosniff for script, style, and document responses.',
+          webResult.finalUrl,
+          ['https://developer.mozilla.org/docs/Web/HTTP/Headers/X-Content-Type-Options'],
+          SCORE_WEIGHTS.nosniff
+        )
+      );
+    }
+
+    if (!headers['permissions-policy']) {
+      findings.push(
+        makeFinding(
+          'permissions-policy-missing',
+          'Permissions-Policy header is missing',
+          'low',
+          'medium',
+          'The response did not define any browser feature policy restrictions.',
+          'Define Permissions-Policy to disable unneeded browser features such as camera, microphone, and geolocation.',
+          webResult.finalUrl,
+          ['https://developer.mozilla.org/docs/Web/HTTP/Headers/Permissions-Policy'],
+          SCORE_WEIGHTS.permissionsPolicy
+        )
+      );
+    }
+
+    const coop = headers['cross-origin-opener-policy'];
+    const coep = headers['cross-origin-embedder-policy'];
+    const corp = headers['cross-origin-resource-policy'];
+    if (!coop || !coep || !corp) {
+      findings.push(
+        makeFinding(
+          'cross-origin-isolation-incomplete',
+          'Cross-origin isolation headers are incomplete',
+          'low',
+          'medium',
+          `COOP=${coop || 'missing'}, COEP=${coep || 'missing'}, CORP=${corp || 'missing'}.`,
+          'Set COOP, COEP, and CORP deliberately if the site depends on cross-origin isolation or wants stricter embedding/resource controls.',
+          webResult.finalUrl,
+          ['https://developer.mozilla.org/docs/Web/HTTP/Headers/Cross-Origin-Opener-Policy'],
+          SCORE_WEIGHTS.crossOriginIsolation
+        )
+      );
+    }
+
+    const corsOrigin = headers['access-control-allow-origin'];
+    const corsCreds = headers['access-control-allow-credentials'];
+    if (corsOrigin === '*' && corsCreds === 'true') {
+      findings.push(
+        makeFinding(
+          'cors-wildcard-credentials',
+          'CORS allows wildcard origins with credentials',
+          'critical',
+          'high',
+          `Access-Control-Allow-Origin=${corsOrigin}; Access-Control-Allow-Credentials=${corsCreds}.`,
+          'Do not combine credentialed responses with wildcard origins. Restrict origins explicitly.',
+          webResult.finalUrl,
+          ['https://developer.mozilla.org/docs/Web/HTTP/CORS'],
+          SCORE_WEIGHTS.cors
+        )
+      );
+    }
+
+    const insecureCookies = (webResult.setCookies || []).filter((cookie) => {
+      const flags = cookieFlags(cookie);
+      return !flags.secure || !flags.httpOnly || !flags.sameSite;
+    });
+    if (insecureCookies.length > 0) {
+      findings.push(
+        makeFinding(
+          'cookie-flags-missing',
+          'One or more cookies are missing Secure, HttpOnly, or SameSite',
+          'medium',
+          'high',
+          insecureCookies.slice(0, 3).join(' | '),
+          'Mark session cookies as Secure and HttpOnly, and set an intentional SameSite value.',
+          webResult.finalUrl,
+          ['https://developer.mozilla.org/docs/Web/HTTP/Headers/Set-Cookie'],
+          SCORE_WEIGHTS.cookies
+        )
+      );
+    }
+
+    const securityText = fileResults.security;
+    if (securityText.status === 200) {
+      if (!/^Contact:/mi.test(securityText.text) || !/^Expires:/mi.test(securityText.text)) {
+        findings.push(
+          makeFinding(
+            'securitytxt-invalid',
+            'security.txt is present but incomplete',
+            'low',
+            'medium',
+            'security.txt did not include both Contact and Expires directives.',
+            'Publish a valid RFC 9116 security.txt with at least Contact and Expires directives.',
+            `${targetUrl.origin}/.well-known/security.txt`,
+            ['https://www.rfc-editor.org/rfc/rfc9116'],
+            SCORE_WEIGHTS.securityTxt
+          )
+        );
+      }
+    } else {
+      findings.push(
+        makeFinding(
+          'securitytxt-missing',
+          'security.txt is missing',
+          'low',
+          'medium',
+          'No security.txt file was returned from /.well-known/security.txt.',
+          'Publish a security.txt file for vulnerability disclosure contacts and expectations.',
+          `${targetUrl.origin}/.well-known/security.txt`,
+          ['https://www.rfc-editor.org/rfc/rfc9116'],
+          SCORE_WEIGHTS.securityTxt
+        )
+      );
+    }
+
+    const robotsText = fileResults.robots;
+    if (robotsText.status === 200) {
+      if (/disallow:\s*\/(?:admin|backup|private|internal)/i.test(robotsText.text)) {
+        findings.push(
+          makeFinding(
+            'robots-sensitive-paths',
+            'robots.txt exposes sensitive path hints',
+            'low',
+            'medium',
+            'robots.txt disallows paths that look administrative or private.',
+            'Do not rely on robots.txt to hide sensitive paths. Protect or remove unnecessary disclosures.',
+            `${targetUrl.origin}/robots.txt`,
+            ['https://www.rfc-editor.org/rfc/rfc9309'],
+            SCORE_WEIGHTS.robots
+          )
+        );
+      }
+    }
+
+    if (isHttps && webResult.body && /\b(?:src|href)=["']http:\/\//i.test(webResult.body)) {
+      findings.push(
+        makeFinding(
+          'mixed-content-signal',
+          'Mixed-content references were detected in the HTML response',
+          'medium',
+          'medium',
+          'The fetched HTML contained at least one explicit http:// asset or link reference.',
+          'Remove insecure asset references or upgrade them to HTTPS to avoid mixed-content exposure.',
+          webResult.finalUrl,
+          ['https://developer.mozilla.org/docs/Web/Security/Mixed_content'],
+          SCORE_WEIGHTS.mixedContent
+        )
+      );
+    }
+
+    const maxScore = Object.values(SCORE_WEIGHTS).reduce((sum, value) => sum + value, 0);
+    const deducted = findings.reduce((sum, finding) => sum + finding.weight, 0);
+    const score = Math.max(0, Math.round((Math.max(0, maxScore - deducted) / maxScore) * 100));
+    const grade = scoreToGrade(score);
+
+    checks.push({
+      name: 'URL Validation',
+      status: dnsResult.success ? 'pass' : 'fail',
+      message: dnsResult.success ? `Resolved publicly: ${dnsResult.addresses.slice(0, 2).join(', ')}` : 'Public DNS resolution failed',
+      details: `Hostname: ${hostname}`,
+    });
+    checks.push({
+      name: 'HTTPS Check',
+      status: isHttps ? 'pass' : 'fail',
+      message: isHttps ? 'HTTPS is used.' : 'HTTPS is not used.',
+      details: targetUrl.toString(),
+    });
+    checks.push({
+      name: 'SSL/TLS Certificate',
+      status: tlsResult.success ? 'pass' : 'fail',
+      message: tlsResult.success ? `${tlsResult.protocol} / ${tlsResult.cipher?.standardName || tlsResult.cipher?.name || 'cipher unavailable'}` : (tlsResult.error || tlsResult.authorizationError || 'TLS validation failed'),
+      details: tlsResult.certificateChain?.join(' -> ') || 'No validated certificate chain',
+    });
+    checks.push({
+      name: 'Content Security Policy (CSP)',
+      status: headers['content-security-policy'] ? 'pass' : 'warn',
+      message: headers['content-security-policy'] ? 'CSP header detected.' : 'CSP header is missing.',
+      details: headers['content-security-policy'] || 'No Content-Security-Policy header',
+    });
+    checks.push({
+      name: 'HSTS Check',
+      status: headers['strict-transport-security'] ? 'pass' : 'warn',
+      message: headers['strict-transport-security'] ? 'HSTS header detected.' : 'HSTS header is missing.',
+      details: headers['strict-transport-security'] || 'No Strict-Transport-Security header',
+    });
+    checks.push({
+      name: 'X-Frame-Options',
+      status: headers['x-frame-options'] || /frame-ancestors/i.test(headers['content-security-policy'] || '') ? 'pass' : 'fail',
+      message: headers['x-frame-options'] ? `Header active: ${headers['x-frame-options']}` : 'Header missing',
+      details: 'frame-ancestors in CSP also satisfies this control.',
+    });
+    checks.push({
+      name: 'X-Content-Type-Options',
+      status: headers['x-content-type-options'] ? 'pass' : 'warn',
+      message: headers['x-content-type-options'] ? 'nosniff is active.' : 'Header missing',
+      details: headers['x-content-type-options'] || 'No X-Content-Type-Options header',
+    });
+    checks.push({
+      name: 'Referrer Policy',
+      status: headers['referrer-policy'] ? 'pass' : 'warn',
+      message: headers['referrer-policy'] ? `Policy: ${headers['referrer-policy']}` : 'Header missing',
+      details: headers['referrer-policy'] || 'No Referrer-Policy header',
+    });
+    checks.push({
+      name: 'CORS Policy Check',
+      status: corsOrigin === '*' && corsCreds === 'true' ? 'fail' : corsOrigin ? 'warn' : 'pass',
+      message: corsOrigin ? `Access-Control-Allow-Origin: ${corsOrigin}` : 'No permissive CORS header detected.',
+      details: corsCreds ? `Credentials: ${corsCreds}` : 'Credentials header absent',
+    });
+    checks.push({
+      name: 'Cookie Security Check',
+      status: insecureCookies.length ? 'warn' : 'pass',
+      message: insecureCookies.length ? `${insecureCookies.length} cookie(s) missing one or more flags.` : 'Observed cookies use Secure, HttpOnly, and SameSite or no cookies were set.',
+      details: insecureCookies[0] || 'No insecure cookie observed in this request.',
+    });
+    checks.push({
+      name: 'robots.txt presence',
+      status: robotsText.status === 200 || securityText.status === 200 ? 'pass' : 'warn',
+      message: `robots.txt: ${robotsText.status === 200 ? 'present' : 'missing'} | security.txt: ${securityText.status === 200 ? 'present' : 'missing'}`,
+      details: 'Presence alone is not sufficient; contents were validated separately.',
+    });
+
+    const comparison = compareWithBaseline(score, findings, baseline);
+
     return NextResponse.json({
       success: true,
       hostname,
       url: targetUrl.toString(),
-      score: finalScore,
-      grade: scoreToGrade(finalScore),
+      finalUrl: webResult.finalUrl,
+      score,
+      grade,
       checks,
+      findings,
+      scoring: {
+        model: 'weighted-subtractive-v1',
+        maxScore,
+        documentedWeights: SCORE_WEIGHTS,
+      },
+      comparison,
+      redirectChain: webResult.redirectChain,
+      tls: {
+        protocol: tlsResult.protocol || '',
+        cipher: tlsResult.cipher || null,
+        certificateChain: tlsResult.certificateChain || [],
+        issuer: tlsResult.issuer || '',
+        subject: tlsResult.subject || '',
+        validTo: tlsResult.validTo || '',
+      },
+      cookies: (webResult.setCookies || []).map((cookie) => ({ raw: cookie, ...cookieFlags(cookie) })),
+      headers,
+      supportFiles: {
+        robots: { status: robotsText.status, found: robotsText.status === 200 },
+        securityTxt: { status: securityText.status, found: securityText.status === 200 },
+      },
+      partial: !webResult.success || !dnsResult.success,
     });
   } catch (error) {
     return jsonError(error);

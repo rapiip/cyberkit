@@ -350,16 +350,17 @@ export const passwordStrengthTool: ToolDefinition = {
       data: resultData,
       rawOutput: JSON.stringify(resultData, null, 2),
       severity: breachCount > 0 ? 'critical' : estimate.score < 2 ? 'high' : estimate.score < 3 ? 'medium' : 'info',
-      items: [
-        { label: 'zxcvbn-ts Score', value: `${estimate.score}/4`, status: estimate.score >= 3 ? 'pass' : estimate.score === 2 ? 'warn' : 'fail' },
-        { label: 'Offline Fast Hash', value: estimate.crackTimesDisplay.offlineFastHashing1e10PerSecond, status: estimate.score >= 3 ? 'pass' : 'warn' },
-        { label: 'Online Throttled', value: estimate.crackTimesDisplay.onlineThrottling100PerHour, status: estimate.score >= 2 ? 'pass' : 'warn' },
-        { label: 'Pattern Warning', value: estimate.feedback.warning || 'None', status: estimate.feedback.warning ? 'warn' : 'pass' },
-        { label: 'Patterns', value: patternWarnings.join(', ') || 'No common pattern detected', status: patternWarnings.length ? 'warn' : 'pass' },
-        { label: 'Breach Status', value: breachStatus, status: breachCount > 0 ? 'fail' : breachStatus === 'Unavailable' ? 'warn' : 'pass' },
-        { label: 'Recommendations', value: recommendations.join(' '), status: estimate.score >= 3 && breachCount === 0 ? 'info' : 'warn' },
-      ],
-    };
+        items: [
+          { label: 'zxcvbn-ts Score', value: `${estimate.score}/4`, status: estimate.score >= 3 ? 'pass' : estimate.score === 2 ? 'warn' : 'fail' },
+          { label: 'Offline Fast Hash', value: estimate.crackTimesDisplay.offlineFastHashing1e10PerSecond, status: estimate.score >= 3 ? 'pass' : 'warn' },
+          { label: 'Online Throttled', value: estimate.crackTimesDisplay.onlineThrottling100PerHour, status: estimate.score >= 2 ? 'pass' : 'warn' },
+          { label: 'Pattern Warning', value: estimate.feedback.warning || 'None', status: estimate.feedback.warning ? 'warn' : 'pass' },
+          { label: 'Feedback', value: estimate.feedback.suggestions.join(' ') || 'No additional feedback', status: estimate.feedback.suggestions.length ? 'warn' : 'info' },
+          { label: 'Patterns', value: patternWarnings.join(', ') || 'No common pattern detected', status: patternWarnings.length ? 'warn' : 'pass' },
+          { label: 'Breach Status', value: breachStatus, status: breachCount > 0 ? 'fail' : breachStatus === 'Unavailable' ? 'warn' : 'pass' },
+          { label: 'Recommendations', value: recommendations.join(' '), status: estimate.score >= 3 && breachCount === 0 ? 'info' : 'warn' },
+        ],
+      };
   },
 };
 

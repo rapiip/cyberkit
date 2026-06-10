@@ -14,6 +14,12 @@ export const TIMEOUTS = {
   dnsRdapMs: 8000,
 };
 
+export const OUTBOUND_LIMITS = {
+  maxRedirects: 4,
+  maxBodyBytes: 512 * 1024,
+  maxDecompressedBytes: 1024 * 1024,
+};
+
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 interface CacheEntry<T> {
@@ -177,10 +183,92 @@ export function withTimeoutSignal(timeoutMs: number) {
 export async function fetchWithTimeout(input: string | URL, init: RequestInit = {}, timeoutMs = TIMEOUTS.httpMs) {
   const timeout = withTimeoutSignal(timeoutMs);
   try {
-    return await fetch(input, { ...init, signal: timeout.signal });
+    return await fetch(input, { redirect: 'manual', ...init, signal: timeout.signal });
   } finally {
     timeout.clear();
   }
+}
+
+export async function fetchWithRetry(
+  input: string | URL,
+  init: RequestInit = {},
+  timeoutMs = TIMEOUTS.httpMs,
+  attempts = 2
+) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(input, init, timeoutMs);
+      if (response.status >= 500 && attempt < attempts) continue;
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Request failed');
+}
+
+export function isJsonLikeContentType(value: string | null) {
+  return value ? /\bapplication\/(?:[\w.+-]*\+)?json\b/i.test(value) : false;
+}
+
+export function isTextLikeContentType(value: string | null) {
+  return value ? /^(text\/|application\/xml\b|application\/javascript\b|application\/x-javascript\b|application\/rss\+xml\b|application\/atom\+xml\b)/i.test(value) : false;
+}
+
+async function readLimitedBody(response: Response, limitBytes: number) {
+  const contentLength = Number(response.headers.get('content-length') || 0);
+  if (contentLength > limitBytes) {
+    throw new PublicTargetError(`Response exceeds limit of ${limitBytes} bytes`, 502, 'RESPONSE_TOO_LARGE');
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > limitBytes) {
+      reader.cancel().catch(() => undefined);
+      throw new PublicTargetError(`Response exceeds limit of ${limitBytes} bytes`, 502, 'RESPONSE_TOO_LARGE');
+    }
+    chunks.push(value);
+  }
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return merged;
+}
+
+export async function readJsonResponse<T>(response: Response, options?: { allowedContentTypes?: RegExp[]; limitBytes?: number }) {
+  const allowed = options?.allowedContentTypes ?? [/\bjson\b/i];
+  const contentType = response.headers.get('content-type');
+  if (contentType && !allowed.some((pattern) => pattern.test(contentType))) {
+    throw new PublicTargetError(`Unexpected content-type: ${contentType}`, 502, 'UNEXPECTED_CONTENT_TYPE');
+  }
+  const bytes = await readLimitedBody(response, options?.limitBytes ?? OUTBOUND_LIMITS.maxBodyBytes);
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as T;
+  } catch {
+    throw new PublicTargetError('Provider returned invalid JSON', 502, 'INVALID_PROVIDER_JSON');
+  }
+}
+
+export async function readTextResponse(response: Response, options?: { allowedContentTypes?: RegExp[]; limitBytes?: number }) {
+  const allowed = options?.allowedContentTypes;
+  const contentType = response.headers.get('content-type');
+  if (allowed && contentType && !allowed.some((pattern) => pattern.test(contentType))) {
+    throw new PublicTargetError(`Unexpected content-type: ${contentType}`, 502, 'UNEXPECTED_CONTENT_TYPE');
+  }
+  const bytes = await readLimitedBody(response, options?.limitBytes ?? OUTBOUND_LIMITS.maxDecompressedBytes);
+  return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
 }
 
 export function normalizeHostname(input: string) {
@@ -310,7 +398,12 @@ export async function assertPublicHostname(hostname: string) {
   return host;
 }
 
-export async function fetchPublicHttp(url: URL, init: RequestInit = {}, timeoutMs = TIMEOUTS.httpMs, maxRedirects = 4) {
+export async function fetchPublicHttp(
+  url: URL,
+  init: RequestInit = {},
+  timeoutMs = TIMEOUTS.httpMs,
+  maxRedirects = OUTBOUND_LIMITS.maxRedirects
+) {
   let current = new URL(url);
   for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
     const response = await requestPublicHttp(current, init, timeoutMs);
@@ -322,6 +415,32 @@ export async function fetchPublicHttp(url: URL, init: RequestInit = {}, timeoutM
   }
 
   throw new PublicTargetError('Too many redirects from target', 508);
+}
+
+export interface RedirectHop {
+  url: string;
+  status: number;
+  location?: string;
+}
+
+export async function fetchPublicHttpWithRedirects(
+  url: URL,
+  init: RequestInit = {},
+  timeoutMs = TIMEOUTS.httpMs,
+  maxRedirects = OUTBOUND_LIMITS.maxRedirects
+) {
+  let current = new URL(url);
+  const redirectChain: RedirectHop[] = [];
+  for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
+    const response = await requestPublicHttp(current, init, timeoutMs);
+    const location = response.headers.get('location') || undefined;
+    redirectChain.push({ url: current.toString(), status: response.status, location });
+    if (![301, 302, 303, 307, 308].includes(response.status) || !location) {
+      return { response, redirectChain, finalUrl: current };
+    }
+    current = normalizeTargetUrl(location, current);
+  }
+  throw new PublicTargetError('Too many redirects from target', 508, 'TOO_MANY_REDIRECTS');
 }
 
 function responseHeadersFromNode(headers: http.IncomingHttpHeaders) {

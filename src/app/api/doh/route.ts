@@ -1,18 +1,20 @@
 import { NextResponse } from 'next/server';
+import dns from 'dns';
 import {
   assertPublicHostname,
   cachedJson,
   consumeRateLimit,
   errorResponse,
-  envHeader,
-  fetchWithTimeout,
+  fetchWithRetry,
   jsonError,
   parseJsonBody,
   rateLimitResponse,
+  readJsonResponse,
   TIMEOUTS,
 } from '@/lib/server/scanner';
 
-const DNS_TYPES = ['A', 'AAAA', 'MX', 'TXT', 'NS', 'CNAME', 'CAA'] as const;
+const dnsPromises = dns.promises;
+const DNS_TYPES = ['A', 'AAAA', 'MX', 'TXT', 'NS', 'CAA'] as const;
 type DnsType = (typeof DNS_TYPES)[number];
 
 interface GoogleDohAnswer {
@@ -40,38 +42,78 @@ async function queryGoogleDoh(hostname: string, type: DnsType) {
     url.searchParams.set('name', hostname);
     url.searchParams.set('type', type);
     url.searchParams.set('do', '1');
-
-    const response = await fetchWithTimeout(
+    const response = await fetchWithRetry(
       url,
       { headers: { Accept: 'application/dns-json' } },
       TIMEOUTS.dnsRdapMs
     );
     if (!response.ok) throw new Error(`Google DoH returned HTTP ${response.status}`);
-
-    const data = (await response.json()) as GoogleDohResponse;
+    const data = await readJsonResponse<GoogleDohResponse>(response);
     return {
+      provider: 'Google Public DNS over HTTPS',
+      timestamp: new Date().toISOString(),
       type,
       status: data.Status,
       dnssecAuthenticated: data.AD,
       truncated: data.TC,
       recursionAvailable: data.RA,
+      confidence: data.Status === 0 ? 'high' : 'low',
       answers: data.Answer || [],
       comment: data.Comment || '',
+      unavailable: false,
     };
-  });
+  }).catch((error: unknown) => ({
+    provider: 'Google Public DNS over HTTPS',
+    timestamp: new Date().toISOString(),
+    type,
+    status: -1,
+    dnssecAuthenticated: false,
+    truncated: false,
+    recursionAvailable: false,
+    confidence: 'low',
+    answers: [],
+    comment: error instanceof Error ? error.message : 'DoH lookup failed',
+    unavailable: true,
+  }));
 }
 
-async function querySecurityTrails(hostname: string) {
-  if (!process.env.SECURITYTRAILS_API_KEY) return null;
-  return cachedJson(`securitytrails:dns:${hostname}`, 10 * 60_000, async () => {
-    const response = await fetchWithTimeout(
-      `https://api.securitytrails.com/v1/domain/${encodeURIComponent(hostname)}/dns`,
-      { headers: { Accept: 'application/json', ...envHeader('SECURITYTRAILS_API_KEY', 'APIKEY') } },
-      TIMEOUTS.dnsRdapMs
-    );
-    if (!response.ok) throw new Error(`SecurityTrails returned HTTP ${response.status}`);
-    return response.json() as Promise<unknown>;
-  }).catch((error: unknown) => ({ error: error instanceof Error ? error.message : 'SecurityTrails lookup failed' }));
+async function queryLocal(hostname: string, type: DnsType) {
+  try {
+    const values = await (async () => {
+      switch (type) {
+        case 'A':
+          return dnsPromises.resolve4(hostname, { ttl: true });
+        case 'AAAA':
+          return dnsPromises.resolve6(hostname, { ttl: true });
+        case 'MX':
+          return dnsPromises.resolveMx(hostname);
+        case 'TXT':
+          return dnsPromises.resolveTxt(hostname);
+        case 'NS':
+          return dnsPromises.resolveNs(hostname);
+        case 'CAA':
+          return dnsPromises.resolveCaa(hostname);
+      }
+    })();
+    return {
+      provider: 'Node.js resolver',
+      timestamp: new Date().toISOString(),
+      type,
+      confidence: 'medium',
+      unavailable: false,
+      values: Array.isArray(values) ? values.map((value) => Array.isArray(value) ? value.join(' ') : value) : [],
+    };
+  } catch (error) {
+    return {
+      provider: 'Node.js resolver',
+      timestamp: new Date().toISOString(),
+      type,
+      confidence: 'low',
+      unavailable: true,
+      values: [],
+      error: error instanceof Error ? error.message : 'Local resolver failed',
+    };
+  }
 }
 
 export async function POST(request: Request) {
@@ -91,15 +133,21 @@ export async function POST(request: Request) {
     if (rate.limited) return rateLimitResponse(rate.retryAfter);
 
     const types = isDnsType(body.type) ? [body.type.toUpperCase() as DnsType] : DNS_TYPES;
-    const results = await Promise.all(types.map((type) => queryGoogleDoh(hostname, type)));
-    const securityTrails = await querySecurityTrails(hostname);
+    const comparisons = await Promise.all(
+      types.map(async (type) => ({
+        type,
+        local: await queryLocal(hostname, type),
+        doh: await queryGoogleDoh(hostname, type),
+      }))
+    );
 
     return NextResponse.json({
       success: true,
-      provider: 'Google Public DNS over HTTPS',
       hostname,
-      results,
-      securityTrails,
+      provider: 'Resolver comparison',
+      timestamp: new Date().toISOString(),
+      partial: comparisons.some((item) => item.local.unavailable || item.doh.unavailable),
+      comparisons,
     });
   } catch (error) {
     return jsonError(error);

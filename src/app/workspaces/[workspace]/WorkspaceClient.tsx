@@ -113,11 +113,20 @@ export default function WorkspaceClient({
         )}
       </header>
 
-      {(workspace.id === 'password-security' || workspace.id === 'jwt-inspector') && (
+      {(
+        workspace.id === 'password-security' ||
+        workspace.id === 'jwt-inspector' ||
+        workspace.id === 'secret-scanner' ||
+        workspace.id === 'file-triage-ioc'
+      ) && (
         <aside className="rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/5 p-4 text-sm text-muted-foreground">
           {workspace.id === 'password-security'
-            ? 'Password inputs and generated values remain in browser memory and are excluded from history, reports, analytics, localStorage, exports, and Cloud Sync. Optional HIBP checks send only a five-character SHA-1 prefix; suffix matching happens locally.'
-            : 'JWT tokens, verification secrets, public keys, and JWKS material are processed locally and excluded from history, reports, analytics, localStorage, exports, and Cloud Sync. Decoding alone never establishes authenticity.'}
+            ? 'Password inputs and generated values remain in browser memory and are excluded from history, reports, analytics, localStorage, exports, and Cloud Sync. Optional HIBP checks send only a five-character SHA-1 prefix, receive a parsed range, and keep suffix matching local.'
+            : workspace.id === 'jwt-inspector'
+              ? 'JWT tokens, verification secrets, public keys, and JWKS material are processed locally and excluded from history, reports, analytics, localStorage, exports, and Cloud Sync. Decoding alone never establishes authenticity, and sensitive claims are redacted by default.'
+              : workspace.id === 'secret-scanner'
+                ? 'Secret scanning runs locally by default. Findings are redacted, excluded from history, reports, analytics, localStorage, exports, and Cloud Sync, and can ignore comments or fixture paths to reduce false positives.'
+                : 'File triage and IOC extraction run locally by default. Uploaded files, extracted strings, metadata, hashes, and IOC results are excluded from history, reports, analytics, localStorage, exports, and Cloud Sync. Provider enrichment is never performed unless you explicitly request it.'}
         </aside>
       )}
 

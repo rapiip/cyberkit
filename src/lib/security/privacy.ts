@@ -5,6 +5,12 @@ export const PERSISTENCE_RESTRICTED_TOOL_IDS = new Set([
   'password-strength',
   'pwned-password',
   'jwt-decoder',
+  'github-secret',
+  'exif-viewer',
+  'mime-checker',
+  'magic-bytes',
+  'string-extractor',
+  'ioc-extractor',
 ]);
 
 export function isPersistenceRestrictedTool(toolId: string): boolean {

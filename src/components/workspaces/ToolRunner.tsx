@@ -11,11 +11,12 @@ import {
   Info,
   Play,
   Upload,
+  X,
 } from 'lucide-react';
 import { useHistoryStore } from '@/lib/store';
 import { createToolResultExport, normalizeToolResult } from '@/lib/tools/result-model';
 import type { ToolMetadata } from '@/lib/tools/metadata';
-import type { ToolInput, ToolResult } from '@/lib/tools/types';
+import type { ToolExecutionProgress, ToolInput, ToolResult } from '@/lib/tools/types';
 
 interface ToolRunnerProps {
   tool: ToolMetadata;
@@ -33,19 +34,27 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
   });
   const [result, setResult] = useState<ToolResult | null>(null);
   const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<ToolExecutionProgress | null>(null);
   const [copied, setCopied] = useState(false);
   const [activeResultTab, setActiveResultTab] = useState<'summary' | 'raw' | 'explanation'>('summary');
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const abortControllerRef = useRef<AbortController | null>(null);
   const addEntry = useHistoryStore((state) => state.addEntry);
 
   const handleRun = async () => {
     setRunning(true);
     setResult(null);
+    setProgress(null);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     try {
       const { loadToolExecutor } = await import('@/lib/tools/registry');
       const executableTool = await loadToolExecutor(tool.slug);
       if (!executableTool) throw new Error('Tool executor is unavailable.');
-      const nextResult = await executableTool.execute(formValues);
+      const nextResult = await executableTool.execute(formValues, {
+        signal: controller.signal,
+        onProgress: setProgress,
+      });
       setResult(nextResult);
       setActiveResultTab('summary');
 
@@ -69,13 +78,25 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
       setResult(
         normalizeToolResult({
           success: false,
-          summary: `Error: ${error instanceof Error ? error.message : 'Tool execution failed'}`,
+          summary: `Error: ${
+            error instanceof Error
+              ? error.name === 'AbortError'
+                ? 'Tool execution cancelled'
+                : error.message
+              : 'Tool execution failed'
+          }`,
           data: {},
         })
       );
     } finally {
+      abortControllerRef.current = null;
       setRunning(false);
+      setProgress(null);
     }
+  };
+
+  const handleCancel = () => {
+    abortControllerRef.current?.abort();
   };
 
   const handleCopy = async () => {
@@ -165,7 +186,15 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
                 fileInputRefs.current[input.id] = element;
               }}
               type="file"
-              onChange={(event) => handleInputChange(input, event.target.files?.[0] || null)}
+              multiple={input.multiple}
+              onChange={(event) =>
+                handleInputChange(
+                  input,
+                  input.multiple
+                    ? Array.from(event.target.files || [])
+                    : event.target.files?.[0] || null
+                )
+              }
               className="sr-only"
             />
             <button
@@ -174,7 +203,13 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
               className="btn-cyber btn-secondary w-full text-sm"
             >
               <Upload size={15} />
-              {formValues[input.id] ? (formValues[input.id] as File).name : 'Choose file'}
+              {Array.isArray(formValues[input.id])
+                ? `${(formValues[input.id] as File[]).length} file(s) selected`
+                : formValues[input.id]
+                  ? (formValues[input.id] as File).name
+                  : input.multiple
+                    ? 'Choose files'
+                    : 'Choose file'}
             </button>
           </div>
         );
@@ -241,6 +276,29 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
               </>
             )}
           </button>
+          {running && (
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="btn-cyber btn-ghost w-full text-sm"
+            >
+              <X size={15} /> Cancel
+            </button>
+          )}
+          {running && progress && (
+            <div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span>{progress.label}</span>
+                <span>{progress.current}/{progress.total}</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-background">
+                <div
+                  className="h-full bg-cyber-cyan transition-all"
+                  style={{ width: `${Math.max(0, Math.min(100, (progress.current / Math.max(progress.total, 1)) * 100))}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -316,9 +374,9 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
             <div className="flex-1 overflow-auto">
               {activeResultTab === 'summary' && (
                 <div className="space-y-2">
-                  {result.items?.map((item) => (
+                  {result.items?.map((item, index) => (
                     <div
-                      key={`${item.label}-${item.value}`}
+                      key={`${index}-${item.label}-${item.value}`}
                       className="flex items-center justify-between gap-3 rounded-lg bg-surface px-3 py-2 text-sm"
                     >
                       <span className="text-muted-foreground">{item.label}</span>

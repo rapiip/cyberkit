@@ -1486,8 +1486,8 @@ const rawToolMetadata = [
     "slug": "exif-viewer",
     "name": "EXIF Metadata Viewer",
     "category": "forensics",
-    "description": "Extract and view EXIF metadata from image files including camera info, GPS, timestamps.",
-    "shortDescription": "Extract EXIF metadata from images",
+    "description": "Extract local file metadata, hashes, and EXIF details from images without uploading them.",
+    "shortDescription": "Extract EXIF and file metadata from images",
     "tags": [
       "exif",
       "metadata",
@@ -1498,12 +1498,14 @@ const rawToolMetadata = [
     "difficulty": "beginner",
     "executionType": "client",
     "isFeatured": false,
+    "persistHistory": false,
     "inputs": [
       {
         "id": "file",
         "label": "Image File",
         "type": "file",
-        "required": true
+        "required": true,
+        "helperText": "Processed locally in your browser. Maximum 15 MB."
       }
     ]
   },
@@ -1512,8 +1514,8 @@ const rawToolMetadata = [
     "slug": "mime-checker",
     "name": "MIME Type Checker",
     "category": "forensics",
-    "description": "Check file MIME type based on content and extension. Detect mismatches.",
-    "shortDescription": "Check and verify file MIME types",
+    "description": "Compare extension, declared MIME type, and magic-byte detection for a local file.",
+    "shortDescription": "Check extension, MIME, and magic-byte consistency",
     "tags": [
       "mime",
       "type",
@@ -1523,12 +1525,14 @@ const rawToolMetadata = [
     "difficulty": "beginner",
     "executionType": "client",
     "isFeatured": false,
+    "persistHistory": false,
     "inputs": [
       {
         "id": "file",
         "label": "File",
         "type": "file",
-        "required": true
+        "required": true,
+        "helperText": "Processed locally in your browser. Maximum 15 MB."
       }
     ]
   },
@@ -1537,8 +1541,8 @@ const rawToolMetadata = [
     "slug": "magic-bytes",
     "name": "Magic Bytes Viewer",
     "category": "forensics",
-    "description": "View hex dump of file header bytes to identify true file type.",
-    "shortDescription": "View file magic bytes",
+    "description": "Inspect local file headers together with detected type and integrity hashes.",
+    "shortDescription": "Inspect magic bytes and file signatures",
     "tags": [
       "magic",
       "bytes",
@@ -1548,18 +1552,14 @@ const rawToolMetadata = [
     "difficulty": "intermediate",
     "executionType": "client",
     "isFeatured": false,
+    "persistHistory": false,
     "inputs": [
       {
         "id": "file",
         "label": "File",
         "type": "file",
-        "required": true
-      },
-      {
-        "id": "byteCount",
-        "label": "Bytes to Show",
-        "type": "number",
-        "defaultValue": 64
+        "required": true,
+        "helperText": "Processed locally in your browser. Maximum 15 MB."
       }
     ]
   },
@@ -1568,8 +1568,8 @@ const rawToolMetadata = [
     "slug": "string-extractor",
     "name": "String Extractor",
     "category": "forensics",
-    "description": "Extract readable ASCII strings from binary files, like Unix strings command.",
-    "shortDescription": "Extract strings from binary files",
+    "description": "Extract printable strings, embedded URLs, hashes, and other IOCs from local files.",
+    "shortDescription": "Extract strings and embedded IOCs from files",
     "tags": [
       "strings",
       "extract",
@@ -1579,18 +1579,14 @@ const rawToolMetadata = [
     "difficulty": "intermediate",
     "executionType": "client",
     "isFeatured": false,
+    "persistHistory": false,
     "inputs": [
       {
         "id": "file",
         "label": "File",
         "type": "file",
-        "required": true
-      },
-      {
-        "id": "minLength",
-        "label": "Min String Length",
-        "type": "number",
-        "defaultValue": 4
+        "required": true,
+        "helperText": "Processed locally in your browser. Maximum 15 MB."
       }
     ]
   },
@@ -1599,8 +1595,8 @@ const rawToolMetadata = [
     "slug": "ioc-extractor",
     "name": "IOC Extractor",
     "category": "forensics",
-    "description": "Extract Indicators of Compromise from text: IPs, domains, URLs, emails, hashes.",
-    "shortDescription": "Extract IOCs from text/logs",
+    "description": "Extract and validate local IOC candidates from text or files, including defanged IPs, domains, URLs, emails, and hashes.",
+    "shortDescription": "Extract and validate IOCs locally",
     "tags": [
       "ioc",
       "indicator",
@@ -1611,13 +1607,26 @@ const rawToolMetadata = [
     "difficulty": "intermediate",
     "executionType": "client",
     "isFeatured": false,
+    "persistHistory": false,
     "inputs": [
       {
         "id": "input",
         "label": "Text / Logs",
         "type": "textarea",
-        "placeholder": "Paste logs or text...",
-        "required": true
+        "placeholder": "Paste logs, alert text, or decoded strings..."
+      },
+      {
+        "id": "file",
+        "label": "Optional File",
+        "type": "file",
+        "helperText": "Optional local file. Strings and metadata are scanned locally without upload."
+      },
+      {
+        "id": "enableEnrichment",
+        "label": "Explicitly allow provider enrichment",
+        "type": "checkbox",
+        "defaultValue": false,
+        "helperText": "Disabled by default. This build performs local analysis only unless a provider is configured later."
       }
     ]
   },
@@ -1652,8 +1661,8 @@ const rawToolMetadata = [
     "slug": "github-secret",
     "name": "GitHub Secret Pattern Checker",
     "category": "osint",
-    "description": "Scan text for common secret patterns like API keys, tokens, passwords, and credentials that should not be in code.",
-    "shortDescription": "Detect secrets and API keys in code",
+    "description": "Scan pasted text or uploaded files for likely secrets using local, redacted pattern matching with entropy checks and false-positive controls.",
+    "shortDescription": "Detect secrets in code and files",
     "tags": [
       "github",
       "secret",
@@ -1665,13 +1674,46 @@ const rawToolMetadata = [
     "difficulty": "intermediate",
     "executionType": "client",
     "isFeatured": false,
+    "persistHistory": false,
     "inputs": [
       {
         "id": "input",
         "label": "Code / Text",
         "type": "textarea",
-        "placeholder": "Paste code to scan for secrets...",
-        "required": true
+        "placeholder": "Paste code to scan for secrets..."
+      },
+      {
+        "id": "files",
+        "label": "Files",
+        "type": "file",
+        "helperText": "Optional. Scan one or more local files without uploading them.",
+        "multiple": true
+      },
+      {
+        "id": "allowlist",
+        "label": "Allowlist Terms",
+        "type": "textarea",
+        "placeholder": "example-token\nfixture-secret",
+        "helperText": "One term per line. Matching lines are skipped before reporting."
+      },
+      {
+        "id": "ignoreComments",
+        "label": "Ignore comment lines",
+        "type": "checkbox",
+        "defaultValue": true
+      },
+      {
+        "id": "ignoreFixtures",
+        "label": "Ignore test and fixture paths",
+        "type": "checkbox",
+        "defaultValue": true
+      },
+      {
+        "id": "minEntropy",
+        "label": "Minimum entropy",
+        "type": "number",
+        "defaultValue": 3.2,
+        "helperText": "Raise this to reduce generic false positives."
       }
     ]
   },
@@ -1920,11 +1962,23 @@ const limitationOverrides: Partial<Record<string, string[]>> = {
   'exif-viewer': ['The current parser reads a limited EXIF subset and does not cover all IPTC/XMP metadata.'],
   'pwned-password': ['Requires network access to the HIBP range service.'],
   'jwt-decoder': ['Signature verification supports HS256/384/512 and RS256/384/512 with a local secret, SPKI public key, or pasted JWKS. Decoding alone never proves authenticity.'],
-  'github-secret': ['Pattern matching can produce false positives and false negatives.'],
+  'github-secret': ['Pattern matching can still produce false positives and false negatives even with entropy, allowlists, and fixture/comment filters.'],
+  'ioc-extractor': ['Provider enrichment is disabled by default and is not performed unless explicitly requested and configured.'],
 };
 
 function privacyLevelFor(tool: BaseToolMetadata): PrivacyLevel {
-  if (['password-generator', 'password-strength', 'jwt-decoder', 'github-secret', 'file-hash'].includes(tool.id)) {
+  if ([
+    'password-generator',
+    'password-strength',
+    'jwt-decoder',
+    'github-secret',
+    'file-hash',
+    'exif-viewer',
+    'mime-checker',
+    'magic-bytes',
+    'string-extractor',
+    'ioc-extractor',
+  ].includes(tool.id)) {
     return 'sensitive-local';
   }
   if (tool.executionType === 'client') return 'local';
@@ -1936,7 +1990,7 @@ function coverageFor(toolId: string): ToolTestCoverage {
   if (toolId === 'pwned-password') {
     return { status: 'e2e', unit: true, route: true, fixtures: true, e2e: true };
   }
-  if (['password-generator', 'password-strength', 'jwt-decoder'].includes(toolId)) {
+  if (['password-generator', 'password-strength', 'jwt-decoder', 'github-secret', 'ioc-extractor'].includes(toolId)) {
     return { status: 'integration', unit: true, route: false, fixtures: true, e2e: false };
   }
   if (toolId === 'dns-lookup') {

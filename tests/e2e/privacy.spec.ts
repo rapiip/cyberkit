@@ -86,3 +86,19 @@ test('Cloud Sync encrypts before network transport', async ({ page }) => {
   const envelope = requestBody?.envelope as Record<string, unknown>;
   expect(Object.keys(envelope).sort()).toEqual(['ciphertext', 'iv', 'salt', 'timestamp', 'version']);
 });
+
+test('Secret Scanner keeps findings local and redacted during file scanning', async ({ page }) => {
+  const secret = 'ghp_1234567890abcdefghijklmnopqrstuvwxyzABCD';
+  await page.goto('/workspaces/secret-scanner');
+  await expect(page.getByText('Secret scanning runs locally by default')).toBeVisible();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'secrets.ts',
+    mimeType: 'text/plain',
+    buffer: Buffer.from(`export const token = "${secret}";`),
+  });
+  await page.getByRole('button', { name: 'Run GitHub Secret Pattern Checker' }).click();
+  await expect(page.getByText('Masked Preview', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('ghp_***ABCD').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Export structured JSON result' })).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(secret);
+});

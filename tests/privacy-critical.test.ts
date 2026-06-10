@@ -4,6 +4,8 @@ import {
   CloudSyncDecryptionError,
   decryptSyncData,
   encryptSyncData,
+  isSyncEnvelopeExpired,
+  syncEnvelopeExpiresAt,
 } from '../src/lib/security/cloud-sync';
 import { inspectJwt } from '../src/lib/security/jwt';
 import {
@@ -97,6 +99,12 @@ test('Cloud Sync encrypts, authenticates, versions, and rejects wrong passphrase
     () => decryptSyncData(tampered, 'correct horse battery staple'),
     CloudSyncDecryptionError
   );
+  assert.equal(syncEnvelopeExpiresAt(first, 3_600), new Date(Date.parse(first.timestamp) + 3_600_000).toISOString());
+  assert.equal(isSyncEnvelopeExpired(first, 3_600, Date.parse(first.timestamp) + 3_600_001), true);
+  await assert.rejects(
+    () => decryptSyncData({ ...first, version: 2 } as unknown as typeof first, 'correct horse battery staple'),
+    /Unsupported|malformed/
+  );
 });
 
 test('JWT inspection rejects malformed Base64URL and non-object JSON', async () => {
@@ -106,6 +114,16 @@ test('JWT inspection rejects malformed Base64URL and non-object JSON', async () 
   );
   const arrayHeader = `${base64Url('[]')}.${base64Url('{}')}.`;
   await assert.rejects(() => inspectJwt(arrayHeader), /JSON object/);
+});
+
+test('JWT inspection flags missing signatures for signed algorithms instead of treating them as valid', async () => {
+  const now = 1_800_000_000;
+  const inspected = await inspectJwt(
+    `${base64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))}.${base64Url(JSON.stringify({ exp: now + 300 }))}.`,
+    { nowSeconds: now }
+  );
+  assert.equal(inspected.warnings.some((warning) => warning.id === 'missing-signature'), true);
+  assert.equal(inspected.verification.status, 'not-requested');
 });
 
 test('JWT inspection detects unsigned, expired, missing exp, future nbf, and suspicious lifetime', async () => {
@@ -248,9 +266,25 @@ test('stores reject password data before state or localStorage persistence', () 
       format: 'json',
       toolsUsed: ['password-generator'],
     });
+    useHistoryStore.getState().addEntry({
+      toolId: 'ioc-extractor',
+      toolName: 'IOC Extractor',
+      input: 'file: sample.txt',
+      resultSummary: 'indicator found',
+      rawResult: 'https://evil.example',
+      status: 'success',
+    });
+    useReportsStore.getState().addReport({
+      title: 'Secret scan',
+      target: 'local',
+      content: 'masked only',
+      format: 'json',
+      toolsUsed: ['github-secret'],
+    });
     assert.deepEqual(useHistoryStore.getState().entries, []);
     assert.deepEqual(useReportsStore.getState().reports, []);
     assert.equal(writes.some((value) => value.includes('secret')), false);
+    assert.equal(writes.some((value) => value.includes('evil.example')), false);
   } finally {
     if (originalWindow === undefined) delete globals.window;
     else globals.window = originalWindow;

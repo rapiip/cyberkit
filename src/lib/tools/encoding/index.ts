@@ -324,7 +324,9 @@ export const jwtDecoderTool: ToolDefinition = {
         explanation: 'Decoding proves only that the token structure is readable. Cryptographic authenticity is claimed only when the signature status is verified. Sensitive claim values are masked in output by default.',
         items: [
           { label: 'Algorithm', value: inspection.algorithm, status: inspection.algorithm === 'none' ? 'fail' : 'info' },
+          { label: 'Authenticity', value: inspection.verification.status === 'verified' ? 'Cryptographically verified' : 'Not established', status: inspection.verification.status === 'verified' ? 'pass' : 'warn' },
           { label: 'Signature', value: inspection.verification.message, status: inspection.verification.status === 'verified' ? 'pass' : inspection.verification.status === 'not-requested' ? 'warn' : 'fail' },
+          { label: 'Clock Skew', value: `${inspection.clockSkewSeconds} second(s)`, status: 'info' },
           { label: 'exp', value: inspection.claims.exp !== undefined ? new Date(inspection.claims.exp * 1000).toISOString() : 'Missing', status: inspection.warnings.some((warning) => warning.id === 'expired' || warning.id === 'missing-exp') ? 'fail' : 'pass' },
           { label: 'nbf', value: inspection.claims.nbf !== undefined ? new Date(inspection.claims.nbf * 1000).toISOString() : 'Not set', status: inspection.warnings.some((warning) => warning.id === 'not-before') ? 'fail' : 'info' },
           { label: 'iat', value: inspection.claims.iat !== undefined ? new Date(inspection.claims.iat * 1000).toISOString() : 'Not set', status: inspection.warnings.some((warning) => warning.id === 'future-iat') ? 'warn' : 'info' },

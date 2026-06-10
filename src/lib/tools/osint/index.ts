@@ -1,5 +1,6 @@
 import type { ToolDefinition } from '../types';
-import { asString } from '../validation';
+import { LOCAL_ANALYSIS_MAX_FILE_BYTES, scanSecretsInText } from '@/lib/security/local-analysis';
+import { asString, assertFiles, optionalString } from '../validation';
 
 export const emailFormatTool: ToolDefinition = {
   id: 'email-format', slug: 'email-format', name: 'Email Format Checker', category: 'osint',
@@ -29,37 +30,75 @@ export const emailFormatTool: ToolDefinition = {
 
 export const githubSecretTool: ToolDefinition = {
   id: 'github-secret', slug: 'github-secret', name: 'GitHub Secret Pattern Checker', category: 'osint',
-  description: 'Scan text for common secret patterns like API keys, tokens, passwords, and credentials that should not be in code.',
-  shortDescription: 'Detect secrets and API keys in code',
+  description: 'Scan pasted text or uploaded files for likely secrets using local, redacted pattern matching with entropy checks and false-positive controls.',
+  shortDescription: 'Detect secrets in code and files',
   tags: ['github', 'secret', 'api-key', 'token', 'leak', 'security'], difficulty: 'intermediate', executionType: 'client', isFeatured: false,
-  inputs: [{ id: 'input', label: 'Code / Text', type: 'textarea', placeholder: 'Paste code to scan for secrets...', required: true }],
-  execute: async (inputs) => {
-    const text = asString(inputs.input, 'Code / text', 200_000);
-    const patterns: { name: string; regex: RegExp }[] = [
-      { name: 'AWS Access Key', regex: /AKIA[0-9A-Z]{16}/g },
-      { name: 'AWS Secret Key', regex: /(?:aws_secret|secret_key|secretkey)[\s=:'"]+([A-Za-z0-9/+=]{40})/gi },
-      { name: 'GitHub Token', regex: /gh[ps]_[A-Za-z0-9_]{36,}/g },
-      { name: 'Google API Key', regex: /AIza[0-9A-Za-z_-]{35}/g },
-      { name: 'Slack Token', regex: /xox[baprs]-[0-9a-zA-Z-]+/g },
-      { name: 'Private Key', regex: /-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----/g },
-      { name: 'Generic API Key', regex: /(?:api[_-]?key|apikey|api_secret)[\s=:'"]+([a-zA-Z0-9_-]{20,})/gi },
-      { name: 'Generic Secret', regex: /(?:secret|password|passwd|pwd)[\s=:'"]+([^\s'"]{8,})/gi },
-      { name: 'JWT Token', regex: /eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g },
-      { name: 'Bearer Token', regex: /Bearer\s+[a-zA-Z0-9_\-.]{20,}/g },
-    ];
-    const findings: { type: string; match: string; line: number }[] = [];
-    const lines = text.split('\n');
-    for (const p of patterns) {
-      for (let i = 0; i < lines.length; i++) {
-        const matches = lines[i].match(p.regex);
-        if (matches) matches.forEach(m => findings.push({ type: p.name, match: m.substring(0, 60), line: i + 1 }));
-      }
+  persistHistory: false,
+  inputs: [
+    { id: 'input', label: 'Code / Text', type: 'textarea', placeholder: 'Paste code to scan for secrets...' },
+    { id: 'files', label: 'Files', type: 'file', helperText: 'Optional. Scan one or more local files without uploading them.', multiple: true },
+    { id: 'allowlist', label: 'Allowlist Terms', type: 'textarea', placeholder: 'example-token\nfixture-secret', helperText: 'One term per line. Matching lines are skipped before reporting.' },
+    { id: 'ignoreComments', label: 'Ignore comment lines', type: 'checkbox', defaultValue: true },
+    { id: 'ignoreFixtures', label: 'Ignore test and fixture paths', type: 'checkbox', defaultValue: true },
+    { id: 'minEntropy', label: 'Minimum entropy', type: 'number', defaultValue: 3.2, helperText: 'Raise this to reduce generic false positives.' },
+  ],
+  execute: async (inputs, context) => {
+    const pasted = optionalString(inputs.input).trim();
+    const files = Array.isArray(inputs.files) && inputs.files.length
+      ? assertFiles(inputs.files, 'Files', LOCAL_ANALYSIS_MAX_FILE_BYTES)
+      : [];
+    if (!pasted && files.length === 0) {
+      throw new Error('Provide pasted text or at least one file to scan.');
     }
-    const raw = findings.length ? findings.map(f => `[Line ${f.line}] ${f.type}: ${f.match}`).join('\n') : 'No secrets detected';
+    const allowlist = optionalString(inputs.allowlist)
+      .split(/\r?\n/)
+      .map((line) => line.trim().toLowerCase())
+      .filter(Boolean);
+    const options = {
+      allowlist,
+      ignoreComments: Boolean(inputs.ignoreComments ?? true),
+      ignoreTestFixtures: Boolean(inputs.ignoreFixtures ?? true),
+      minEntropy: Math.max(0, Number(inputs.minEntropy) || 3.2),
+    };
+
+    const findings = [];
+    const scanSources = [
+      ...(pasted ? [{ name: 'pasted-input.txt', text: asString(pasted, 'Code / text', 200_000) }] : []),
+      ...files.map((file) => ({ file })),
+    ];
+
+    for (let index = 0; index < scanSources.length; index += 1) {
+      if (context?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+      const source = scanSources[index];
+      context?.onProgress?.({
+        current: index + 1,
+        total: scanSources.length,
+        label: 'Scanning source for secrets',
+      });
+      if ('text' in source) {
+        findings.push(...scanSecretsInText(source.name, source.text, options));
+        continue;
+      }
+      const text = await source.file.text();
+      findings.push(...scanSecretsInText(source.file.name, text, options));
+    }
+
+    const raw = findings.length
+      ? findings.map((finding) => `[${finding.location}] ${finding.type} (${finding.confidence}): ${finding.maskedPreview}`).join('\n')
+      : 'No secrets detected';
     return {
-      success: true, summary: `${findings.length} potential secret(s) found`, data: { findings, count: findings.length }, rawOutput: raw,
+      success: true, summary: `${findings.length} potential secret(s) found across ${scanSources.length} source(s)`, data: { findings, count: findings.length }, rawOutput: raw,
       severity: findings.length > 0 ? 'high' : undefined,
-      items: findings.length ? findings.map(f => ({ label: f.type, value: `Line ${f.line}: ${f.match}`, status: 'fail' as const })) : [{ label: 'Result', value: 'No secrets detected', status: 'pass' as const }],
+      explanation: 'Scanning runs locally in the browser. Findings are redacted by default, deduplicated, filtered with entropy thresholds, and can ignore comments or test fixtures to reduce false positives.',
+      items: findings.length
+        ? findings.flatMap((finding) => ([
+            { label: 'Type', value: finding.type, status: 'fail' as const },
+            { label: 'Location', value: finding.location, status: 'info' as const },
+            { label: 'Line', value: String(finding.line), status: 'info' as const },
+            { label: 'Confidence', value: finding.confidence, status: finding.confidence === 'high' ? 'fail' as const : 'warn' as const },
+            { label: 'Masked Preview', value: finding.maskedPreview, status: 'warn' as const },
+          ]))
+        : [{ label: 'Result', value: 'No secrets detected', status: 'pass' as const }],
     };
   },
 };
