@@ -18,6 +18,8 @@ import {
   Workflow,
 } from 'lucide-react';
 import ToolRunner from '@/components/workspaces/ToolRunner';
+import HashWorkbenchPanel from '@/components/workspaces/HashWorkbenchPanel';
+import TransformationPipeline from '@/components/workspaces/TransformationPipeline';
 import StatePanel from '@/components/ui/StatePanel';
 import type { ToolMetadata } from '@/lib/tools/metadata';
 import type { WorkspaceDefinition } from '@/lib/tools/workspaces';
@@ -209,6 +211,16 @@ export default function WorkspaceClient({
 
           {activeTool ? (
             <section aria-labelledby="active-panel-heading">
+              {(workspace.id === 'data-transformation' || workspace.id === 'ctf-decoder-workbench') && (
+                <div className="mb-6">
+                  <TransformationPipeline workspaceId={workspace.id} />
+                </div>
+              )}
+              {workspace.id === 'hash-crypto-workbench' && (
+                <div className="mb-6">
+                  <HashWorkbenchPanel />
+                </div>
+              )}
               <div className="mb-4">
                 <h2 id="active-panel-heading" className="text-xl font-semibold">
                   {activeTool.name}

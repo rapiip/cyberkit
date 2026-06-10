@@ -6,6 +6,10 @@ import { ArrowLeftRight, ArrowRight } from 'lucide-react';
 import { allToolMetadata } from '@/lib/tools/metadata';
 import StatePanel from '@/components/ui/StatePanel';
 import type { ToolMetadata } from '@/lib/tools/metadata';
+import {
+  canQuickRunTransformTool,
+  quickRunTransformTool,
+} from '@/lib/tools/transforms/quick-run';
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'An error occurred';
@@ -43,17 +47,24 @@ export default function CompareToolsPage() {
     setLeftSuccess(false);
 
     try {
-      const { loadToolExecutor } = await import('@/lib/tools/registry');
-      const executor = await loadToolExecutor(leftTool.slug);
-      if (!executor) throw new Error('Tool executor is unavailable.');
-      const result = await executor.execute({
-        input: leftInput,
-        token: leftInput, // For JWT
-        mode: leftMode,
-        // Fallbacks for other hashing/crypto tools
-        shift: 3,
-        separator: ' ',
-      });
+      const result = canQuickRunTransformTool(leftTool.id)
+        ? {
+            success: true,
+            rawOutput: await quickRunTransformTool(leftTool, { input: leftInput, mode: leftMode }),
+            summary: '',
+          }
+        : await (async () => {
+            const { loadToolExecutor } = await import('@/lib/tools/registry');
+            const executor = await loadToolExecutor(leftTool.slug);
+            if (!executor) throw new Error('Tool executor is unavailable.');
+            return executor.execute({
+              input: leftInput,
+              token: leftInput,
+              mode: leftMode,
+              shift: 3,
+              separator: ' ',
+            });
+          })();
 
       if (result.success) {
         setLeftOutput(result.rawOutput || '');
@@ -73,16 +84,24 @@ export default function CompareToolsPage() {
     setRightSuccess(false);
 
     try {
-      const { loadToolExecutor } = await import('@/lib/tools/registry');
-      const executor = await loadToolExecutor(rightTool.slug);
-      if (!executor) throw new Error('Tool executor is unavailable.');
-      const result = await executor.execute({
-        input: rightInput,
-        token: rightInput,
-        mode: rightMode,
-        shift: 3,
-        separator: ' ',
-      });
+      const result = canQuickRunTransformTool(rightTool.id)
+        ? {
+            success: true,
+            rawOutput: await quickRunTransformTool(rightTool, { input: rightInput, mode: rightMode }),
+            summary: '',
+          }
+        : await (async () => {
+            const { loadToolExecutor } = await import('@/lib/tools/registry');
+            const executor = await loadToolExecutor(rightTool.slug);
+            if (!executor) throw new Error('Tool executor is unavailable.');
+            return executor.execute({
+              input: rightInput,
+              token: rightInput,
+              mode: rightMode,
+              shift: 3,
+              separator: ' ',
+            });
+          })();
 
       if (result.success) {
         setRightOutput(result.rawOutput || '');

@@ -1,6 +1,10 @@
 import type { ToolDefinition } from '../types';
 import { asString, errorResult, optionalString } from '../validation';
 import { inspectJwt } from '@/lib/security/jwt';
+import {
+  executeTransformOperation,
+  suggestTransformOperations,
+} from '@/lib/tools/transforms/engine';
 
 export const base64Tool: ToolDefinition = {
   id: 'base64',
@@ -21,10 +25,18 @@ export const base64Tool: ToolDefinition = {
     const input = asString(inputs.input, 'Input');
     const mode = optionalString(inputs.mode, 'encode');
     try {
-      const result = mode === 'encode' ? btoa(unescape(encodeURIComponent(input))) : decodeURIComponent(escape(atob(input)));
-      return { success: true, summary: `${mode === 'encode' ? 'Encoded' : 'Decoded'} successfully (${result.length} chars)`, data: { result }, rawOutput: result, explanation: mode === 'encode' ? 'The input text was converted to Base64 by encoding each character into its binary representation, then grouping bits into 6-bit chunks mapped to the Base64 alphabet (A-Z, a-z, 0-9, +, /).' : 'The Base64 string was decoded by mapping each character back to its 6-bit value, reconstructing the original binary data, and converting it to text.' };
-    } catch {
-      return { success: false, summary: 'Invalid input for the selected mode', data: { error: 'Failed to process input' }, rawOutput: 'Error: Invalid input' };
+      const result = executeTransformOperation(mode === 'encode' ? 'base64-encode' : 'base64-decode', input).output;
+      return {
+        success: true,
+        summary: `${mode === 'encode' ? 'Encoded' : 'Decoded'} successfully (${result.length} chars)`,
+        data: { result, suggestions: suggestTransformOperations(input) },
+        rawOutput: result,
+        explanation: mode === 'encode'
+          ? 'The input text was transformed with the shared workspace engine into Base64 using UTF-8 bytes.'
+          : 'The Base64 string was decoded through the shared workspace engine with strict UTF-8 decoding.',
+      };
+    } catch (error) {
+      return errorResult(error, 'Invalid input for the selected mode');
     }
   },
 };
@@ -48,17 +60,16 @@ export const urlEncoderTool: ToolDefinition = {
     const input = asString(inputs.input, 'Input');
     const mode = optionalString(inputs.mode, 'encode');
     try {
-      let result: string;
-      switch (mode) {
-        case 'encode': result = encodeURI(input); break;
-        case 'decode': result = decodeURI(input); break;
-        case 'encodeComponent': result = encodeURIComponent(input); break;
-        case 'decodeComponent': result = decodeURIComponent(input); break;
-        default: result = encodeURIComponent(input);
-      }
+      const operationByMode = {
+        encode: 'url-encode',
+        decode: 'url-decode',
+        encodeComponent: 'url-encode-component',
+        decodeComponent: 'url-decode-component',
+      } as const;
+      const result = executeTransformOperation(operationByMode[mode as keyof typeof operationByMode] ?? 'url-encode-component', input).output;
       return { success: true, summary: `URL ${mode} completed`, data: { result }, rawOutput: result };
-    } catch {
-      return { success: false, summary: 'Invalid input', data: { error: 'Failed to process input' }, rawOutput: 'Error' };
+    } catch (error) {
+      return errorResult(error, 'Invalid input');
     }
   },
 };
@@ -81,15 +92,7 @@ export const htmlEntityTool: ToolDefinition = {
   execute: async (inputs) => {
     const input = asString(inputs.input, 'Input');
     const mode = optionalString(inputs.mode, 'encode');
-    const entityMap: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' };
-    const reverseMap: Record<string, string> = {};
-    for (const [k, v] of Object.entries(entityMap)) reverseMap[v] = k;
-    let result: string;
-    if (mode === 'encode') {
-      result = input.replace(/[&<>"'`=/]/g, (s) => entityMap[s] || s);
-    } else {
-      result = input.replace(/&amp;|&lt;|&gt;|&quot;|&#39;|&#x2F;|&#x60;|&#x3D;/g, (s) => reverseMap[s] || s);
-    }
+    const result = executeTransformOperation(mode === 'encode' ? 'html-encode' : 'html-decode', input).output;
     return { success: true, summary: `HTML entities ${mode}d`, data: { result }, rawOutput: result };
   },
 };
@@ -115,18 +118,7 @@ export const hexConverterTool: ToolDefinition = {
     const mode = optionalString(inputs.mode, 'encode');
     const sep = optionalString(inputs.separator, ' ');
     try {
-      let result: string;
-      if (mode === 'encode') {
-        const hexArr = Array.from(input).map(c => c.charCodeAt(0).toString(16).padStart(2, '0'));
-        result = sep === '0x' ? hexArr.map(h => '0x' + h).join(' ') : hexArr.join(sep);
-      } else {
-        const cleaned = input.replace(/0x/gi, '').replace(/[^0-9a-fA-F]/g, '');
-        if (!cleaned || cleaned.length % 2 !== 0 || /[^0-9a-fA-F]/.test(cleaned)) {
-          throw new Error('Invalid hex input. Use complete byte pairs such as 48 65 6c 6c 6f.');
-        }
-        const pairs = cleaned.match(/.{1,2}/g) || [];
-        result = pairs.map(h => String.fromCharCode(parseInt(h, 16))).join('');
-      }
+      const result = executeTransformOperation(mode === 'encode' ? 'hex-encode' : 'hex-decode', input, { separator: sep }).output;
       return { success: true, summary: `Hex ${mode === 'encode' ? 'encoding' : 'decoding'} complete`, data: { result }, rawOutput: result };
     } catch (error) {
       return errorResult(error, 'Invalid input');
@@ -153,16 +145,7 @@ export const binaryConverterTool: ToolDefinition = {
     const input = asString(inputs.input, 'Input');
     const mode = optionalString(inputs.mode, 'encode');
     try {
-      let result: string;
-      if (mode === 'encode') {
-        result = Array.from(input).map(c => c.charCodeAt(0).toString(2).padStart(8, '0')).join(' ');
-      } else {
-        if (/[^01\s]/.test(input)) throw new Error('Invalid binary input. Only 0, 1, and whitespace are allowed.');
-        const cleaned = input.replace(/\s/g, '');
-        if (!cleaned || cleaned.length % 8 !== 0) throw new Error('Invalid binary input. Use complete 8-bit bytes.');
-        const bytes = cleaned.match(/.{1,8}/g) || [];
-        result = bytes.map(b => String.fromCharCode(parseInt(b, 2))).join('');
-      }
+      const result = executeTransformOperation(mode === 'encode' ? 'binary-encode' : 'binary-decode', input).output;
       return { success: true, summary: `Binary ${mode === 'encode' ? 'encoding' : 'decoding'} complete`, data: { result }, rawOutput: result };
     } catch (error) {
       return errorResult(error, 'Error processing input');
@@ -189,16 +172,10 @@ export const unicodeConverterTool: ToolDefinition = {
     const input = asString(inputs.input, 'Input');
     const mode = optionalString(inputs.mode, 'encode');
     try {
-      let result: string;
-      if (mode === 'encode') {
-        result = Array.from(input).map(c => 'U+' + c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')).join(' ');
-      } else {
-        const codePoints = input.match(/U\+([0-9A-Fa-f]+)/g) || [];
-        result = codePoints.map(cp => String.fromCodePoint(parseInt(cp.replace('U+', ''), 16))).join('');
-      }
+      const result = executeTransformOperation(mode === 'encode' ? 'unicode-encode' : 'unicode-decode', input).output;
       return { success: true, summary: `Unicode conversion complete`, data: { result }, rawOutput: result };
-    } catch {
-      return { success: false, summary: 'Invalid input', data: {}, rawOutput: 'Error' };
+    } catch (error) {
+      return errorResult(error, 'Invalid input');
     }
   },
 };
@@ -219,10 +196,7 @@ export const rot13Tool: ToolDefinition = {
   ],
   execute: async (inputs) => {
     const input = asString(inputs.input, 'Input');
-    const result = input.replace(/[a-zA-Z]/g, (c) => {
-      const base = c <= 'Z' ? 65 : 97;
-      return String.fromCharCode(((c.charCodeAt(0) - base + 13) % 26) + base);
-    });
+    const result = executeTransformOperation('rot13', input).output;
     return { success: true, summary: 'ROT13 applied', data: { result }, rawOutput: result, explanation: 'ROT13 replaces each letter with the letter 13 positions after it. Since the alphabet has 26 letters, applying ROT13 twice returns the original text.' };
   },
 };
@@ -248,18 +222,18 @@ export const caesarCipherTool: ToolDefinition = {
     const shift = Number(inputs.shift) || 3;
     const mode = optionalString(inputs.mode, 'encrypt');
 
-    const caesarShift = (text: string, s: number) => text.replace(/[a-zA-Z]/g, (c) => {
-      const base = c <= 'Z' ? 65 : 97;
-      return String.fromCharCode(((c.charCodeAt(0) - base + s + 26) % 26) + base);
-    });
-
     if (mode === 'bruteforce') {
-      const results = Array.from({ length: 25 }, (_, i) => `Shift ${i + 1}: ${caesarShift(input, i + 1)}`).join('\n');
+      const results = Array.from({ length: 25 }, (_, i) =>
+        `Shift ${i + 1}: ${executeTransformOperation('caesar-encrypt', input, { shift: i + 1 }).output}`
+      ).join('\n');
       return { success: true, summary: 'All 25 shifts computed', data: { results }, rawOutput: results };
     }
 
-    const s = mode === 'decrypt' ? -shift : shift;
-    const result = caesarShift(input, s);
+    const result = executeTransformOperation(
+      mode === 'decrypt' ? 'caesar-decrypt' : 'caesar-encrypt',
+      input,
+      { shift }
+    ).output;
     return { success: true, summary: `Caesar cipher ${mode}ed with shift ${shift}`, data: { result }, rawOutput: result };
   },
 };
@@ -360,17 +334,9 @@ export const morseCodeTool: ToolDefinition = {
     { id: 'mode', label: 'Mode', type: 'select', defaultValue: 'encode', options: [{ label: 'Text → Morse', value: 'encode' }, { label: 'Morse → Text', value: 'decode' }] },
   ],
   execute: async (inputs) => {
-    const morseMap: Record<string, string> = { 'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.', 'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..', 'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.', 'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-', 'Y': '-.--', 'Z': '--..', '0': '-----', '1': '.----', '2': '..---', '3': '...--', '4': '....-', '5': '.....', '6': '-....', '7': '--...', '8': '---..', '9': '----.', ' ': '/' };
-    const reverseMorse: Record<string, string> = {};
-    for (const [k, v] of Object.entries(morseMap)) reverseMorse[v] = k;
     const input = asString(inputs.input, 'Input');
     const mode = optionalString(inputs.mode, 'encode');
-    let result: string;
-    if (mode === 'encode') {
-      result = input.toUpperCase().split('').map(c => morseMap[c] || c).join(' ');
-    } else {
-      result = input.split(' / ').map(word => word.split(' ').map(c => reverseMorse[c] || c).join('')).join(' ');
-    }
+    const result = executeTransformOperation(mode === 'encode' ? 'morse-encode' : 'morse-decode', input).output;
     return { success: true, summary: `Morse code ${mode === 'encode' ? 'encoded' : 'decoded'}`, data: { result }, rawOutput: result };
   },
 };

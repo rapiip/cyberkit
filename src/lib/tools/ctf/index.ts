@@ -1,5 +1,6 @@
 import type { ToolDefinition } from '../types';
 import { asString, errorResult, hasNestedQuantifier, optionalString } from '../validation';
+import { executeTransformOperation } from '@/lib/tools/transforms/engine';
 
 export const xorHelperTool: ToolDefinition = {
   id: 'xor-helper', slug: 'xor-helper', name: 'XOR Helper', category: 'ctf',
@@ -18,29 +19,10 @@ export const xorHelperTool: ToolDefinition = {
     const inFmt = optionalString(inputs.inputFormat, 'text');
     const outFmt = optionalString(inputs.outputFormat, 'text');
     try {
-      let inputBytes: number[];
-      if (inFmt === 'hex') {
-        const clean = inputStr.replace(/0x/gi, '').replace(/[^0-9a-fA-F]/g, '');
-        if (!clean || clean.length % 2 !== 0) throw new Error('Invalid hex input. Use complete byte pairs.');
-        inputBytes = (clean.match(/.{1,2}/g) || []).map(h => parseInt(h, 16));
-      } else {
-        inputBytes = Array.from(inputStr).map(c => c.charCodeAt(0));
-      }
-      let keyBytes: number[];
-      if (keyStr.startsWith('0x')) {
-        if (!/^0x[0-9a-fA-F]{2}$/.test(keyStr)) throw new Error('Hex XOR key must be a single byte like 0x41.');
-        keyBytes = [parseInt(keyStr, 16)];
-      } else {
-        keyBytes = Array.from(keyStr).map(c => c.charCodeAt(0));
-      }
-      if (keyBytes.length === 0) throw new Error('XOR key is required.');
-      const result = inputBytes.map((b, i) => b ^ keyBytes[i % keyBytes.length]);
-      let output: string;
-      if (outFmt === 'hex') {
-        output = result.map(b => b.toString(16).padStart(2, '0')).join(' ');
-      } else {
-        output = result.map(b => String.fromCharCode(b)).join('');
-      }
+      const output = executeTransformOperation(outFmt === 'hex' ? 'xor-hex' : 'xor-text', inputStr, {
+        xorKey: keyStr,
+        xorInputFormat: inFmt === 'hex' ? 'hex' : 'text',
+      }).output;
       return { success: true, summary: 'XOR operation complete', data: { result: output }, rawOutput: output };
     } catch (error) {
       return errorResult(error);

@@ -1,19 +1,13 @@
 import type { ToolDefinition } from '../types';
 import { assertFile, asString, errorResult, MAX_FILE_BYTES } from '../validation';
+import { hashFileWithProgress, hashText } from '@/lib/security/hash';
 import {
   checkPwnedPassword,
   estimatePasswordStrength,
   generatePassphrase,
   generatePassword,
+  secureRandomInt,
 } from '@/lib/security/password';
-
-const hashViaWebCrypto = async (algorithm: string, input: string): Promise<string> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  const hashBuffer = await crypto.subtle.digest(algorithm, data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-};
 
 export const md5GeneratorTool: ToolDefinition = {
   id: 'md5-generator',
@@ -31,38 +25,14 @@ export const md5GeneratorTool: ToolDefinition = {
   ],
   execute: async (inputs) => {
     const input = asString(inputs.input, 'Input text');
-    // Simple MD5 implementation (for client-side without crypto-js)
-    const md5 = (s: string): string => {
-      const K = [0xd76aa478,0xe8c7b756,0x242070db,0xc1bdceee,0xf57c0faf,0x4787c62a,0xa8304613,0xfd469501,0x698098d8,0x8b44f7af,0xffff5bb1,0x895cd7be,0x6b901122,0xfd987193,0xa679438e,0x49b40821,0xf61e2562,0xc040b340,0x265e5a51,0xe9b6c7aa,0xd62f105d,0x02441453,0xd8a1e681,0xe7d3fbc8,0x21e1cde6,0xc33707d6,0xf4d50d87,0x455a14ed,0xa9e3e905,0xfcefa3f8,0x676f02d9,0x8d2a4c8a,0xfffa3942,0x8771f681,0x6d9d6122,0xfde5380c,0xa4beea44,0x4bdecfa9,0xf6bb4b60,0xbebfbc70,0x289b7ec6,0xeaa127fa,0xd4ef3085,0x04881d05,0xd9d4d039,0xe6db99e5,0x1fa27cf8,0xc4ac5665,0xf4292244,0x432aff97,0xab9423a7,0xfc93a039,0x655b59c3,0x8f0ccc92,0xffeff47d,0x85845dd1,0x6fa87e4f,0xfe2ce6e0,0xa3014314,0x4e0811a1,0xf7537e82,0xbd3af235,0x2ad7d2bb,0xeb86d391];
-      const S = [7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
-      const add32 = (a: number, b: number) => (a + b) & 0xffffffff;
-      const rotl = (v: number, n: number) => (v << n) | (v >>> (32 - n));
-      const bytes = Array.from(unescape(encodeURIComponent(s))).map(c => c.charCodeAt(0));
-      const len = bytes.length * 8;
-      bytes.push(0x80);
-      while (bytes.length % 64 !== 56) bytes.push(0);
-      for (let i = 0; i < 8; i++) bytes.push((len >>> (i * 8)) & 0xff);
-      let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
-      for (let i = 0; i < bytes.length; i += 64) {
-        const M: number[] = [];
-        for (let j = 0; j < 16; j++) M.push(bytes[i+j*4] | (bytes[i+j*4+1]<<8) | (bytes[i+j*4+2]<<16) | (bytes[i+j*4+3]<<24));
-        let A=a0,B=b0,C=c0,D=d0;
-        for (let j = 0; j < 64; j++) {
-          let F: number, g: number;
-          if (j < 16) { F = (B & C) | (~B & D); g = j; }
-          else if (j < 32) { F = (D & B) | (~D & C); g = (5*j+1)%16; }
-          else if (j < 48) { F = B ^ C ^ D; g = (3*j+5)%16; }
-          else { F = C ^ (B | ~D); g = (7*j)%16; }
-          F = add32(add32(F, A), add32(K[j], M[g]));
-          A = D; D = C; C = B; B = add32(B, rotl(F, S[j]));
-        }
-        a0=add32(a0,A); b0=add32(b0,B); c0=add32(c0,C); d0=add32(d0,D);
-      }
-      const hex = (n: number) => Array.from({length:4},(_,i)=>((n>>>(i*8))&0xff).toString(16).padStart(2,'0')).join('');
-      return hex(a0)+hex(b0)+hex(c0)+hex(d0);
+    const result = await hashText('MD5', input);
+    return {
+      success: true,
+      summary: `MD5 (legacy): ${result}`,
+      data: { hash: result, algorithm: 'MD5', length: '128-bit', trustedForSecurity: false },
+      rawOutput: result,
+      explanation: 'MD5 produces a 128-bit digest, but it is legacy and collision-prone. Use it only for compatibility or weak checksum workflows, not security decisions.',
     };
-    const result = md5(input);
-    return { success: true, summary: `MD5: ${result}`, data: { hash: result, algorithm: 'MD5', length: '128-bit' }, rawOutput: result, explanation: 'MD5 produces a 128-bit (16-byte) hash value, typically rendered as a 32-character hexadecimal string. It is no longer recommended for cryptographic security.' };
   },
 };
 
@@ -81,8 +51,14 @@ export const sha1GeneratorTool: ToolDefinition = {
     { id: 'input', label: 'Input Text', type: 'textarea', placeholder: 'Enter text to hash...', required: true },
   ],
   execute: async (inputs) => {
-    const result = await hashViaWebCrypto('SHA-1', asString(inputs.input, 'Input text'));
-    return { success: true, summary: `SHA-1: ${result}`, data: { hash: result, algorithm: 'SHA-1', length: '160-bit' }, rawOutput: result };
+    const result = await hashText('SHA-1', asString(inputs.input, 'Input text'));
+    return {
+      success: true,
+      summary: `SHA-1 (legacy): ${result}`,
+      data: { hash: result, algorithm: 'SHA-1', length: '160-bit', trustedForSecurity: false },
+      rawOutput: result,
+      explanation: 'SHA-1 is retained for compatibility and checksum comparison, but should not be treated as collision-resistant for modern security use.',
+    };
   },
 };
 
@@ -101,7 +77,7 @@ export const sha256GeneratorTool: ToolDefinition = {
     { id: 'input', label: 'Input Text', type: 'textarea', placeholder: 'Enter text to hash...', required: true },
   ],
   execute: async (inputs) => {
-    const result = await hashViaWebCrypto('SHA-256', asString(inputs.input, 'Input text'));
+    const result = await hashText('SHA-256', asString(inputs.input, 'Input text'));
     return { success: true, summary: `SHA-256: ${result}`, data: { hash: result, algorithm: 'SHA-256', length: '256-bit' }, rawOutput: result };
   },
 };
@@ -121,7 +97,7 @@ export const sha512GeneratorTool: ToolDefinition = {
     { id: 'input', label: 'Input Text', type: 'textarea', placeholder: 'Enter text to hash...', required: true },
   ],
   execute: async (inputs) => {
-    const result = await hashViaWebCrypto('SHA-512', asString(inputs.input, 'Input text'));
+    const result = await hashText('SHA-512', asString(inputs.input, 'Input text'));
     return { success: true, summary: `SHA-512: ${result}`, data: { hash: result, algorithm: 'SHA-512', length: '512-bit' }, rawOutput: result };
   },
 };
@@ -453,7 +429,18 @@ export const hashIdentifierTool: ToolDefinition = {
     if (/^[a-f0-9]{96}$/i.test(hash)) results.push('SHA-384', 'SHA3-384');
     if (/^[a-f0-9]{56}$/i.test(hash)) results.push('SHA-224', 'SHA3-224');
     if (results.length === 0) results.push('Unknown hash type');
-    return { success: true, summary: `Possible: ${results.join(', ')}`, data: { possibleTypes: results, hashLength: hash.length }, rawOutput: `Hash: ${hash}\nLength: ${hash.length} chars\nPossible types: ${results.join(', ')}` };
+    return {
+      success: true,
+      summary: `Candidate formats: ${results.join(', ')}`,
+      data: { possibleTypes: results, hashLength: hash.length, confidence: results[0] === 'Unknown hash type' ? 'low' : 'medium' },
+      rawOutput: `Hash: ${hash}\nLength: ${hash.length} chars\nCandidate formats only: ${results.join(', ')}\nWarning: length and prefix patterns cannot prove the original algorithm.`,
+      explanation: 'Hash identification here is heuristic only. Length, prefix markers, and character sets can narrow candidates, but they do not prove the original algorithm or hash origin.',
+      items: [
+        { label: 'Length', value: `${hash.length} characters`, status: 'info' },
+        { label: 'Candidates', value: results.join(', '), status: results[0] === 'Unknown hash type' ? 'warn' : 'info' },
+        { label: 'Confidence', value: results[0] === 'Unknown hash type' ? 'Low' : 'Medium', status: 'warn' },
+      ],
+    };
   },
 };
 
@@ -471,22 +458,21 @@ export const fileHashTool: ToolDefinition = {
   inputs: [
     { id: 'file', label: 'File', type: 'file', required: true },
   ],
-  execute: async (inputs) => {
+  execute: async (inputs, context) => {
     try {
       const file = assertFile(inputs.file, 'File', MAX_FILE_BYTES);
-      const buffer = await file.arrayBuffer();
-    const sha256 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', buffer))).map(b => b.toString(16).padStart(2, '0')).join('');
-    const sha1 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-1', buffer))).map(b => b.toString(16).padStart(2, '0')).join('');
-    const sha512 = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-512', buffer))).map(b => b.toString(16).padStart(2, '0')).join('');
-    const raw = `File: ${file.name}\nSize: ${file.size} bytes\n\nSHA-256: ${sha256}\nSHA-1: ${sha1}\nSHA-512: ${sha512}`;
+      const hashes = await hashFileWithProgress(file, context?.onProgress);
+      const raw = `File: ${file.name}\nSize: ${file.size} bytes\nRead in chunks: ${hashes.chunkCount}\n\nSHA-256: ${hashes.sha256}\nSHA-1 (legacy): ${hashes.sha1}\nSHA-512: ${hashes.sha512}\nMD5 (legacy): ${hashes.md5}`;
       return {
-        success: true, summary: `SHA-256: ${sha256.substring(0, 16)}...`, data: { fileName: file.name, fileSize: file.size, sha256, sha1, sha512 }, rawOutput: raw,
+        success: true, summary: `SHA-256: ${hashes.sha256.substring(0, 16)}...`, data: { fileName: file.name, fileSize: file.size, ...hashes }, rawOutput: raw,
         items: [
           { label: 'File', value: file.name, status: 'info' },
           { label: 'Size', value: `${file.size} bytes`, status: 'info' },
-          { label: 'SHA-256', value: sha256, status: 'info' },
-          { label: 'SHA-1', value: sha1, status: 'info' },
-          { label: 'SHA-512', value: sha512, status: 'info' },
+          { label: 'Chunks Read', value: String(hashes.chunkCount), status: 'info' },
+          { label: 'SHA-256', value: hashes.sha256, status: 'info' },
+          { label: 'SHA-1', value: `${hashes.sha1} (legacy)`, status: 'warn' },
+          { label: 'SHA-512', value: hashes.sha512, status: 'info' },
+          { label: 'MD5', value: `${hashes.md5} (legacy)`, status: 'warn' },
         ],
       };
     } catch (error) {
@@ -528,9 +514,15 @@ export const randomStringTool: ToolDefinition = {
       all: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?',
     };
     const cs = charsets[inputs.charset as string] || charsets.alphanumeric;
-    const gen = () => { const a = new Uint32Array(length); crypto.getRandomValues(a); return Array.from(a, v => cs[v % cs.length]).join(''); };
+    const gen = () => Array.from({ length }, () => cs[secureRandomInt(cs.length)]).join('');
     const strings = Array.from({ length: count }, () => gen());
-    return { success: true, summary: `Generated ${count} string(s) of length ${length}`, data: { strings }, rawOutput: strings.join('\n') };
+    return {
+      success: true,
+      summary: `Generated ${count} string(s) of length ${length}`,
+      data: { strings, charset: inputs.charset as string, moduloBiasAvoided: true },
+      rawOutput: strings.join('\n'),
+      explanation: 'Random character selection uses rejection sampling to avoid modulo bias when mapping cryptographic randomness into the selected charset.',
+    };
   },
 };
 

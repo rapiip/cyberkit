@@ -1,5 +1,6 @@
 import type { ToolDefinition } from '../types';
 import { asString, optionalString } from '../validation';
+import { analyzeCidr, analyzeSubnet } from './utils';
 
 export const cidrCalculatorTool: ToolDefinition = {
   id: 'cidr-calculator',
@@ -16,34 +17,49 @@ export const cidrCalculatorTool: ToolDefinition = {
     { id: 'cidr', label: 'CIDR Block', type: 'text', placeholder: '192.168.1.0/24', required: true },
   ],
   execute: async (inputs) => {
-    const cidr = asString(inputs.cidr, 'CIDR block', 64).trim();
-    const match = cidr.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/);
-    if (!match) return { success: false, summary: 'Invalid CIDR format', data: {}, rawOutput: 'Error: Use format like 192.168.1.0/24' };
-    const octets = [parseInt(match[1]), parseInt(match[2]), parseInt(match[3]), parseInt(match[4])];
-    const prefix = parseInt(match[5]);
-    if (octets.some(o => o > 255) || prefix > 32) return { success: false, summary: 'Invalid IP or prefix', data: {}, rawOutput: 'Error: Invalid values' };
-    const ip = (octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3];
-    const mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0;
-    const network = (ip & mask) >>> 0;
-    const broadcast = (network | ~mask) >>> 0;
-    const hostCount = Math.max(0, Math.pow(2, 32 - prefix) - 2);
-    const toIP = (n: number) => `${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`;
-    const toMask = (n: number) => toIP(n >>> 0);
-    const firstHost = prefix < 31 ? toIP((network + 1) >>> 0) : toIP(network);
-    const lastHost = prefix < 31 ? toIP((broadcast - 1) >>> 0) : toIP(broadcast);
-    const raw = `CIDR: ${cidr}\nNetwork: ${toIP(network)}\nBroadcast: ${toIP(broadcast)}\nSubnet Mask: ${toMask(mask)}\nFirst Host: ${firstHost}\nLast Host: ${lastHost}\nTotal Hosts: ${hostCount.toLocaleString()}\nPrefix Length: /${prefix}`;
-    return {
-      success: true, summary: `${toIP(network)} — ${hostCount.toLocaleString()} hosts`, data: { network: toIP(network), broadcast: toIP(broadcast), subnetMask: toMask(mask), firstHost, lastHost, hostCount, prefix }, rawOutput: raw,
-      items: [
-        { label: 'Network', value: toIP(network), status: 'info' },
-        { label: 'Broadcast', value: toIP(broadcast), status: 'info' },
-        { label: 'Subnet Mask', value: toMask(mask), status: 'info' },
-        { label: 'First Host', value: firstHost, status: 'info' },
-        { label: 'Last Host', value: lastHost, status: 'info' },
-        { label: 'Total Hosts', value: hostCount.toLocaleString(), status: 'info' },
-        { label: 'Prefix', value: `/${prefix}`, status: 'info' },
-      ],
-    };
+    try {
+      const cidr = asString(inputs.cidr, 'CIDR block', 128).trim();
+      const result = analyzeCidr(cidr);
+      const raw = [
+        `CIDR: ${cidr}`,
+        `IP Version: IPv${result.version}`,
+        `Network: ${result.network}/${result.prefix}`,
+        result.broadcast ? `Broadcast: ${result.broadcast}` : null,
+        `Range Start: ${result.rangeStart}`,
+        `Range End: ${result.rangeEnd}`,
+        `First Host: ${result.firstHost}`,
+        `Last Host: ${result.lastHost}`,
+        `Subnet Mask: ${result.subnetMask}`,
+        `Wildcard: ${result.wildcard}`,
+        `Host Count: ${result.hostCount}`,
+        `Reverse DNS Zone: ${result.reverseZone}`,
+        `Binary Address: ${result.binaryAddress}`,
+        `Binary Mask: ${result.binaryMask}`,
+        result.splitSuggestions.length ? `Split Suggestions: ${result.splitSuggestions.join(', ')}` : null,
+      ].filter(Boolean).join('\n');
+
+      return {
+        success: true,
+        summary: `${result.network}/${result.prefix} — ${result.hostCount} host(s)`,
+        data: result,
+        rawOutput: raw,
+        items: [
+          { label: 'Network', value: `${result.network}/${result.prefix}`, status: 'info' },
+          ...(result.broadcast ? [{ label: 'Broadcast', value: result.broadcast, status: 'info' as const }] : []),
+          { label: 'Range', value: `${result.rangeStart} → ${result.rangeEnd}`, status: 'info' },
+          { label: 'Hosts', value: result.hostCount, status: 'info' },
+          { label: 'Reverse Zone', value: result.reverseZone, status: 'info' },
+          { label: 'Split', value: result.splitSuggestions.join(' | ') || 'No smaller split available', status: 'info' },
+        ],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        summary: error instanceof Error ? error.message : 'Invalid CIDR format',
+        data: {},
+        rawOutput: `Error: ${error instanceof Error ? error.message : 'Use format like 192.168.1.0/24 or 2001:db8::/64'}`,
+      };
+    }
   },
 };
 
@@ -63,45 +79,42 @@ export const subnetCalculatorTool: ToolDefinition = {
     { id: 'mask', label: 'Subnet Mask or Prefix', type: 'text', placeholder: '255.255.255.0 or /24', required: true },
   ],
   execute: async (inputs) => {
-    const ipStr = asString(inputs.ip, 'IP address', 64).trim();
-    const maskStr = asString(inputs.mask, 'Subnet mask or prefix', 64).trim();
-    const parseIP = (s: string) => {
-      const p = s.split('.').map(Number);
-      if (p.length !== 4 || p.some(o => isNaN(o) || o < 0 || o > 255)) return null;
-      return ((p[0] << 24) | (p[1] << 16) | (p[2] << 8) | p[3]) >>> 0;
-    };
-    const toIP = (n: number) => `${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`;
-    const ip = parseIP(ipStr);
-    if (ip === null) return { success: false, summary: 'Invalid IP', data: {}, rawOutput: 'Error' };
-    let mask: number;
-    if (maskStr.startsWith('/')) {
-      const prefix = parseInt(maskStr.slice(1));
-      if (isNaN(prefix) || prefix < 0 || prefix > 32) return { success: false, summary: 'Invalid prefix', data: {}, rawOutput: 'Error' };
-      mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0;
-    } else {
-      const m = parseIP(maskStr);
-      if (m === null) return { success: false, summary: 'Invalid mask', data: {}, rawOutput: 'Error' };
-      mask = m;
+    try {
+      const ipStr = asString(inputs.ip, 'IP address', 128).trim();
+      const maskStr = asString(inputs.mask, 'Subnet mask or prefix', 128).trim();
+      const result = analyzeSubnet(ipStr, maskStr);
+      const raw = [
+        `IP: ${ipStr}`,
+        `Network: ${result.network}/${result.prefix}`,
+        result.broadcast ? `Broadcast: ${result.broadcast}` : null,
+        `Subnet Mask: ${result.subnetMask}`,
+        `Wildcard: ${result.wildcard}`,
+        `Usable Hosts: ${result.hostCount}`,
+        `Range: ${result.rangeStart} → ${result.rangeEnd}`,
+        `Reverse DNS Zone: ${result.reverseZone}`,
+        `Binary Address: ${result.binaryAddress}`,
+      ].filter(Boolean).join('\n');
+      return {
+        success: true,
+        summary: `${result.network}/${result.prefix} — ${result.hostCount} host(s)`,
+        data: result,
+        rawOutput: raw,
+        items: [
+          { label: 'Network', value: `${result.network}/${result.prefix}`, status: 'info' },
+          ...(result.broadcast ? [{ label: 'Broadcast', value: result.broadcast, status: 'info' as const }] : []),
+          { label: 'Subnet Mask', value: result.subnetMask, status: 'info' },
+          { label: 'Wildcard Mask', value: result.wildcard, status: 'info' },
+          { label: 'Range', value: `${result.rangeStart} → ${result.rangeEnd}`, status: 'info' },
+        ],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        summary: error instanceof Error ? error.message : 'Invalid subnet input',
+        data: {},
+        rawOutput: `Error: ${error instanceof Error ? error.message : 'Invalid subnet input'}`,
+      };
     }
-    const network = (ip & mask) >>> 0;
-    const broadcast = (network | ~mask) >>> 0;
-    const wildcard = (~mask) >>> 0;
-    // Count prefix from mask
-    let prefix = 0;
-    let tmp = mask;
-    while (tmp & 0x80000000) { prefix++; tmp = (tmp << 1) >>> 0; }
-    const hostCount = Math.max(0, Math.pow(2, 32 - prefix) - 2);
-    const raw = `IP: ${ipStr}\nNetwork: ${toIP(network)}/${prefix}\nBroadcast: ${toIP(broadcast)}\nSubnet Mask: ${toIP(mask)}\nWildcard: ${toIP(wildcard)}\nUsable Hosts: ${hostCount.toLocaleString()}`;
-    return {
-      success: true, summary: `${toIP(network)}/${prefix} — ${hostCount.toLocaleString()} hosts`, data: { network: toIP(network), broadcast: toIP(broadcast), mask: toIP(mask), wildcard: toIP(wildcard), hostCount, prefix }, rawOutput: raw,
-      items: [
-        { label: 'Network', value: `${toIP(network)}/${prefix}`, status: 'info' },
-        { label: 'Broadcast', value: toIP(broadcast), status: 'info' },
-        { label: 'Subnet Mask', value: toIP(mask), status: 'info' },
-        { label: 'Wildcard Mask', value: toIP(wildcard), status: 'info' },
-        { label: 'Usable Hosts', value: hostCount.toLocaleString(), status: 'info' },
-      ],
-    };
   },
 };
 

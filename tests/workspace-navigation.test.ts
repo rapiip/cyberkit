@@ -80,12 +80,14 @@ test('catalog and homepage do not statically import executor registry', async ()
 });
 
 test('workspace shell exposes mobile, keyboard, loading, empty, and error states', async () => {
-  const [sidebar, palette, workspace, loading, error] = await Promise.all([
+  const [sidebar, palette, workspace, loading, error, pipeline, hashPanel] = await Promise.all([
     readFile('src/components/layout/Sidebar.tsx', 'utf8'),
     readFile('src/components/layout/CommandPalette.tsx', 'utf8'),
     readFile('src/app/workspaces/[workspace]/WorkspaceClient.tsx', 'utf8'),
     readFile('src/app/workspaces/[workspace]/loading.tsx', 'utf8'),
     readFile('src/app/workspaces/[workspace]/error.tsx', 'utf8'),
+    readFile('src/components/workspaces/TransformationPipeline.tsx', 'utf8'),
+    readFile('src/components/workspaces/HashWorkbenchPanel.tsx', 'utf8'),
   ]);
 
   assert.match(sidebar, /aria-label="Mobile navigation"/);
@@ -93,7 +95,14 @@ test('workspace shell exposes mobile, keyboard, loading, empty, and error states
   assert.match(palette, /event\.key === 'ArrowDown'/);
   assert.match(palette, /event\.key === 'ArrowUp'/);
   assert.match(workspace, /No capability panels available/);
+  assert.match(workspace, /TransformationPipeline/);
   assert.match(loading, /aria-label="Loading workspace"/);
   assert.match(error, /Workspace could not be loaded/);
   assert.match(error, /unstable_retry/);
+  assert.match(pipeline, /Save recipe/);
+  assert.match(pipeline, /Undo/);
+  assert.match(pipeline, /Input encoding/);
+  assert.match(pipeline, /Output encoding/);
+  assert.match(hashPanel, /Checksum Comparison/);
+  assert.match(hashPanel, /Expected hash matched|Expected hash did not match/);
 });
