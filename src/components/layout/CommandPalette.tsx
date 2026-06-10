@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Command, X, Terminal } from 'lucide-react';
-import { searchTools } from '@/lib/tools/registry';
+import { searchToolMetadata } from '@/lib/tools/metadata';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 
 const containerVariants: Variants = {
@@ -35,9 +35,10 @@ export default function CommandPalette() {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  const results = searchTools(query).slice(0, 10);
+  const results = searchToolMetadata(query).slice(0, 10);
 
   const closePalette = useCallback(() => {
     setOpen(false);
@@ -62,6 +63,21 @@ export default function CommandPalette() {
         }
       }
       if (e.key === 'Escape') closePalette();
+      if (open && e.key === 'Tab') {
+        const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button, input, [href], select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusable?.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -100,6 +116,10 @@ export default function CommandPalette() {
           onClick={closePalette}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="command-palette-title"
             initial={{ opacity: 0, scale: 0.95, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
@@ -109,6 +129,7 @@ export default function CommandPalette() {
           >
             {/* Search Header */}
             <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border bg-surface/30">
+              <span id="command-palette-title" className="sr-only">Command palette</span>
               <Search size={18} className="text-cyber-cyan shrink-0 text-glow-cyan animate-pulse-glow" />
               <input
                 ref={inputRef}
@@ -125,7 +146,11 @@ export default function CommandPalette() {
                 <kbd className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-muted text-[10px] text-muted-foreground font-mono border border-border">
                   ESC
                 </kbd>
-                <button onClick={closePalette} className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors p-1 hover:bg-surface-hover rounded">
+                <button
+                  onClick={closePalette}
+                  className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors p-1 hover:bg-surface-hover rounded"
+                  aria-label="Close command palette"
+                >
                   <X size={16} />
                 </button>
               </div>
@@ -219,6 +244,7 @@ export function CommandPaletteTrigger() {
     <button
       onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
       className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border text-muted-foreground text-xs hover:border-cyber-cyan/30 hover:text-foreground transition-all cursor-pointer group"
+      aria-label="Open command palette"
     >
       <Search size={14} className="group-hover:text-cyber-cyan transition-colors" />
       <span className="font-mono">Audit command...</span>

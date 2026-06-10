@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Trash2, Download, Upload, Info } from 'lucide-react';
+import { Settings, Trash2, Download, Upload, Info, Cloud, CloudDownload, CloudUpload } from 'lucide-react';
 import {
   importCyberKitData,
   useHistoryStore,
@@ -12,6 +12,9 @@ import {
 } from '@/lib/store';
 
 export default function SettingsPage() {
+  const [syncKey, setSyncKey] = useState('');
+  const [syncStatus, setSyncStatus] = useState('');
+  const [syncing, setSyncing] = useState(false);
   const historyEntries = useHistoryStore((state) => state.entries);
   const loadHistory = useHistoryStore((state) => state.loadFromStorage);
   const clearHistory = useHistoryStore((state) => state.clearHistory);
@@ -29,13 +32,7 @@ export default function SettingsPage() {
   }, [loadFavorites, loadHistory, loadReports]);
 
   const exportData = () => {
-    const data = {
-      version: 1,
-      history: historyEntries,
-      favorites: favoriteTools,
-      reports: savedReports,
-      exportedAt: new Date().toISOString(),
-    };
+    const data = buildExportData();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -44,6 +41,14 @@ export default function SettingsPage() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const buildExportData = () => ({
+      version: 1,
+      history: historyEntries,
+      favorites: favoriteTools,
+      reports: savedReports,
+      exportedAt: new Date().toISOString(),
+    } as const);
 
   const importData = () => {
     const input = document.createElement('input');
@@ -62,6 +67,46 @@ export default function SettingsPage() {
       }
     };
     input.click();
+  };
+
+  const pushCloudSync = async () => {
+    setSyncing(true);
+    setSyncStatus('');
+    try {
+      const response = await fetch('/api/sync', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ syncKey, data: buildExportData() }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || data.error || 'Cloud sync failed');
+      setSyncStatus(`Synced at ${new Date(data.syncedAt).toLocaleString()}`);
+    } catch (error) {
+      setSyncStatus(error instanceof Error ? error.message : 'Cloud sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const pullCloudSync = async () => {
+    setSyncing(true);
+    setSyncStatus('');
+    try {
+      const response = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ syncKey }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || data.error || 'Cloud restore failed');
+      if (!data.found || !data.data) throw new Error('No cloud data found for this sync key');
+      importCyberKitData(validateImportedCyberKitData(data.data));
+      window.location.reload();
+    } catch (error) {
+      setSyncStatus(error instanceof Error ? error.message : 'Cloud restore failed');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
@@ -97,6 +142,37 @@ export default function SettingsPage() {
           <button onClick={exportData} className="btn-cyber btn-secondary flex-1"><Download size={14} /> Export All Data</button>
           <button onClick={importData} className="btn-cyber btn-secondary flex-1"><Upload size={14} /> Import Data</button>
         </div>
+      </div>
+
+      {/* Cloud Sync */}
+      <div className="glass-card p-5 space-y-4">
+        <h2 className="font-semibold text-sm flex items-center gap-2"><Cloud size={14} /> Cloud Sync</h2>
+        <input
+          value={syncKey}
+          onChange={(event) => setSyncKey(event.target.value)}
+          className="input-cyber text-sm"
+          type="password"
+          placeholder="Sync key"
+          minLength={16}
+          maxLength={128}
+        />
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={pushCloudSync}
+            disabled={syncing || syncKey.trim().length < 16}
+            className="btn-cyber btn-secondary flex-1 disabled:opacity-50"
+          >
+            <CloudUpload size={14} /> Push Backup
+          </button>
+          <button
+            onClick={pullCloudSync}
+            disabled={syncing || syncKey.trim().length < 16}
+            className="btn-cyber btn-secondary flex-1 disabled:opacity-50"
+          >
+            <CloudDownload size={14} /> Pull Restore
+          </button>
+        </div>
+        {syncStatus && <p className="text-xs text-muted-foreground">{syncStatus}</p>}
       </div>
 
       {/* Clear Data */}

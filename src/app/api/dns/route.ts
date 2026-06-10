@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     }
 
     const cleanHost = await assertPublicHostname(body.hostname);
-    const rate = consumeRateLimit(request, cleanHost, {
+    const rate = await consumeRateLimit(request, cleanHost, {
       endpoint: 'dns',
       ipLimit: 45,
       targetLimit: 15,

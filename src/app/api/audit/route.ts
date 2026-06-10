@@ -5,6 +5,7 @@ import {
   consumeRateLimit,
   errorResponse,
   fetchPublicHttp,
+  getHeaderValues,
   jsonError,
   normalizeTargetUrl,
   parseJsonBody,
@@ -36,6 +37,8 @@ interface SslAuditResult {
   issuer?: string;
   validTo?: string;
   isExpired?: boolean;
+  authorized?: boolean;
+  authorizationError?: string | null;
   error?: string;
 }
 
@@ -43,6 +46,7 @@ interface WebAuditResult {
   success: boolean;
   status?: number;
   headers?: Record<string, string>;
+  setCookies?: string[];
   error?: string;
 }
 
@@ -69,19 +73,22 @@ async function checkDNS(hostname: string): Promise<DnsAuditResult> {
   }
 }
 
-function checkSSL(hostname: string, isHttps: boolean): Promise<SslAuditResult> {
+async function checkSSL(hostname: string, isHttps: boolean): Promise<SslAuditResult> {
   if (!isHttps) return Promise.resolve({ success: false, error: 'Not using HTTPS' });
 
+  const [address] = await resolveAndBlockPrivateIp(hostname);
   return new Promise((resolve) => {
     const socket = tls.connect(
       {
-        host: hostname,
+        host: address,
         port: 443,
         servername: hostname,
         rejectUnauthorized: false,
       },
       () => {
         const cert = socket.getPeerCertificate(true);
+        const authorized = socket.authorized;
+        const authorizationError = socket.authorizationError ? String(socket.authorizationError) : null;
         socket.destroy();
 
         if (!cert || Object.keys(cert).length === 0) {
@@ -92,10 +99,12 @@ function checkSSL(hostname: string, isHttps: boolean): Promise<SslAuditResult> {
         const validTo = cert.valid_to ? new Date(cert.valid_to) : null;
         const isExpired = validTo ? validTo.getTime() < Date.now() : true;
         resolve({
-          success: !isExpired,
+          success: !isExpired && authorized,
           issuer: certField(cert.issuer?.O) || certField(cert.issuer?.CN) || 'Unknown',
           validTo: validTo?.toISOString(),
           isExpired,
+          authorized,
+          authorizationError,
         });
       }
     );
@@ -130,7 +139,7 @@ async function checkWebHeaders(targetUrl: URL): Promise<WebAuditResult> {
       headers[key.toLowerCase()] = value;
     });
 
-    return { success: true, status: response.status, headers };
+    return { success: true, status: response.status, headers, setCookies: getHeaderValues(response.headers, 'set-cookie') };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Fetch failed';
     return { success: false, error: message };
@@ -174,7 +183,7 @@ export async function POST(request: Request) {
     const hostname = targetUrl.hostname;
     const isHttps = targetUrl.protocol === 'https:';
 
-    const rate = consumeRateLimit(request, hostname, {
+    const rate = await consumeRateLimit(request, hostname, {
       endpoint: 'audit',
       ipLimit: 20,
       targetLimit: 4,
@@ -244,8 +253,10 @@ export async function POST(request: Request) {
       checks.push({
         name: 'SSL/TLS Certificate',
         status: 'fail',
-        message: `SSL Certificate Issue: ${sslResult.error || 'Expired or invalid certificate'}`,
-        details: 'Browsers may display security warnings to users.',
+        message: `SSL Certificate Issue: ${sslResult.error || sslResult.authorizationError || 'Expired or invalid certificate'}`,
+        details: sslResult.authorized === false
+          ? 'Certificate trust chain validation failed.'
+          : 'Browsers may display security warnings to users.',
       });
     }
 
@@ -301,11 +312,12 @@ export async function POST(request: Request) {
         score += 10;
       }
 
-      const setCookie = hdrs['set-cookie'];
-      if (setCookie && (!/httponly/i.test(setCookie) || !/secure/i.test(setCookie))) {
+      const setCookies = webResult.setCookies || getHeaderValues(new Headers(hdrs), 'set-cookie');
+      const insecureCookies = setCookies.filter((cookie) => !/httponly/i.test(cookie) || !/secure/i.test(cookie));
+      if (insecureCookies.length > 0) {
         checks.push({ name: 'Cookie Security Check', status: 'warn', message: 'Cookies issued lack HttpOnly or Secure attributes.', details: 'XSS can read cookies without HttpOnly; network attackers can steal cookies without Secure.' });
       } else {
-        checks.push({ name: 'Cookie Security Check', status: 'pass', message: setCookie ? 'Session cookies use Secure and HttpOnly attributes.' : 'No session cookies set during audit request.', details: 'Cookie exposure risk is low for this request.' });
+        checks.push({ name: 'Cookie Security Check', status: 'pass', message: setCookies.length ? 'Session cookies use Secure and HttpOnly attributes.' : 'No session cookies set during audit request.', details: 'Cookie exposure risk is low for this request.' });
         score += 5;
       }
     } else {

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Search, Heart, Filter } from 'lucide-react';
-import { allTools, searchTools } from '@/lib/tools/registry';
+import { allToolMetadata, searchToolMetadata } from '@/lib/tools/metadata';
 import { categories } from '@/lib/tools/categories';
 import { useFavoritesStore } from '@/lib/store';
 import type { Difficulty, ExecutionType } from '@/lib/tools/types';
@@ -31,7 +31,7 @@ function ToolsPageInner() {
   useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
 
   const filteredTools = useMemo(() => {
-    let tools = query ? searchTools(query) : allTools;
+    let tools = query ? searchToolMetadata(query) : allToolMetadata;
     if (selectedCategory) tools = tools.filter((t) => t.category === selectedCategory);
     if (selectedDifficulty) tools = tools.filter((t) => t.difficulty === selectedDifficulty);
     if (selectedExecution) tools = tools.filter((t) => t.executionType === selectedExecution);
@@ -44,7 +44,7 @@ function ToolsPageInner() {
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold">All Tools</h1>
-        <p className="text-sm text-muted-foreground mt-1">{allTools.length} cybersecurity tools available</p>
+        <p className="text-sm text-muted-foreground mt-1">{allToolMetadata.length} cybersecurity tools available</p>
       </div>
 
       {/* Search + Filter Bar */}

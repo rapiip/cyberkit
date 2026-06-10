@@ -109,6 +109,7 @@ export default function Sidebar() {
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="btn-ghost w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? (
             <ChevronRight size={16} />
@@ -144,6 +145,7 @@ export default function Sidebar() {
             <button
               className="absolute top-4 right-4 text-muted-foreground hover:text-foreground cursor-pointer"
               onClick={() => setMobileOpen(false)}
+              aria-label="Close menu"
             >
               <X size={20} />
             </button>

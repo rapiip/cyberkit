@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import {
   consumeRateLimit,
@@ -10,20 +9,17 @@ import {
   TIMEOUTS,
 } from '@/lib/server/scanner';
 
-function sha1Hex(value: string) {
-  return createHash('sha1').update(value, 'utf8').digest('hex').toUpperCase();
-}
-
 export async function POST(request: Request) {
   try {
-    const body = await parseJsonBody<{ password?: unknown }>(request);
-    const password = body.password;
+    const body = await parseJsonBody<{ hashPrefix?: unknown; hashSuffix?: unknown }>(request);
+    const hashPrefix = typeof body.hashPrefix === 'string' ? body.hashPrefix.trim().toUpperCase() : '';
+    const hashSuffix = typeof body.hashSuffix === 'string' ? body.hashSuffix.trim().toUpperCase() : '';
 
-    if (typeof password !== 'string' || password.length === 0 || password.length > 1024) {
-      return errorResponse('Invalid password provided. Use 1-1024 characters.', 400, 'INVALID_PASSWORD');
+    if (!/^[A-F0-9]{5}$/.test(hashPrefix) || !/^[A-F0-9]{35}$/.test(hashSuffix)) {
+      return errorResponse('Invalid SHA-1 hash range provided.', 400, 'INVALID_HASH_RANGE');
     }
 
-    const rate = consumeRateLimit(request, 'pwned-password', {
+    const rate = await consumeRateLimit(request, 'pwned-password', {
       endpoint: 'pwned-password',
       ipLimit: 30,
       targetLimit: 30,
@@ -31,12 +27,8 @@ export async function POST(request: Request) {
     });
     if (rate.limited) return rateLimitResponse(rate.retryAfter);
 
-    const hash = sha1Hex(password);
-    const prefix = hash.slice(0, 5);
-    const suffix = hash.slice(5);
-
     const response = await fetchWithTimeout(
-      `https://api.pwnedpasswords.com/range/${prefix}`,
+      `https://api.pwnedpasswords.com/range/${hashPrefix}`,
       {
         headers: {
           'Add-Padding': 'true',
@@ -64,7 +56,7 @@ export async function POST(request: Request) {
     const line = text
       .split('\n')
       .map((row) => row.trim())
-      .find((row) => row.startsWith(`${suffix}:`));
+      .find((row) => row.startsWith(`${hashSuffix}:`));
     const breachCount = line ? Number(line.split(':')[1]) || 0 : 0;
 
     return NextResponse.json({
@@ -72,7 +64,7 @@ export async function POST(request: Request) {
       provider: 'Have I Been Pwned Pwned Passwords',
       pwned: breachCount > 0,
       breachCount,
-      hashPrefix: prefix,
+      hashPrefix,
     });
   } catch (error) {
     return jsonError(error);

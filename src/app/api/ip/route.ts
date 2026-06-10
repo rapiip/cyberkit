@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     const resolvedAddresses = net.isIP(query) ? await resolveAndBlockPrivateIp(query) : await resolveAndBlockPrivateIp(await assertPublicHostname(query));
     const resolvedIp = resolvedAddresses[0];
 
-    const rate = consumeRateLimit(request, query, {
+    const rate = await consumeRateLimit(request, query, {
       endpoint: 'ip',
       ipLimit: 35,
       targetLimit: 10,

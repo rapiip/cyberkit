@@ -9,7 +9,7 @@ import {
   FlaskConical, Network, ArrowRight, Zap, Command, Star, Clock,
 } from 'lucide-react';
 import { categories } from '@/lib/tools/categories';
-import { allTools, getFeaturedTools, searchTools } from '@/lib/tools/registry';
+import { allToolMetadata, getFeaturedToolMetadata, searchToolMetadata } from '@/lib/tools/metadata';
 import { useHistoryStore } from '@/lib/store';
 
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -44,10 +44,10 @@ export default function Dashboard() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const featured = getFeaturedTools();
+  const featured = getFeaturedToolMetadata();
   const { entries, loadFromStorage } = useHistoryStore();
   const searchResults = useMemo(
-    () => (searchQuery.trim() ? searchTools(searchQuery).slice(0, 8) : []),
+    () => (searchQuery.trim() ? searchToolMetadata(searchQuery).slice(0, 8) : []),
     [searchQuery]
   );
   const showSearch = isSearchFocused && searchResults.length > 0;
@@ -156,11 +156,11 @@ export default function Dashboard() {
       <motion.section {...fadeUp} transition={{ duration: 0.5, delay: 0.3 }}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Tool Categories</h2>
-          <span className="text-xs text-muted-foreground">{allTools.length} tools total</span>
+          <span className="text-xs text-muted-foreground">{allToolMetadata.length} tools total</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {categories.filter(c => c.id !== 'labs').map((cat) => {
-            const toolCount = allTools.filter((t) => t.category === cat.id).length;
+            const toolCount = allToolMetadata.filter((t) => t.category === cat.id).length;
             return (
               <Link
                 key={cat.id}

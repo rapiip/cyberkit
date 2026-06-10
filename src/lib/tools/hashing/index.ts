@@ -271,7 +271,7 @@ export const pwnedPasswordTool: ToolDefinition = {
   slug: 'pwned-password',
   name: 'Pwned Password Checker',
   category: 'hashing',
-  description: 'Check whether a password appears in the Have I Been Pwned Pwned Passwords corpus using k-anonymity. The plain password is never sent to HIBP; CyberKit sends only the first 5 SHA-1 hash characters from the backend.',
+  description: 'Check whether a password appears in the Have I Been Pwned Pwned Passwords corpus using k-anonymity. The plain password is hashed in the browser; CyberKit sends only the first 5 SHA-1 hash characters to HIBP.',
   shortDescription: 'Check password exposure via HIBP range API',
   tags: ['password', 'pwned', 'hibp', 'breach', 'leak', 'k-anonymity'],
   difficulty: 'beginner',
@@ -284,17 +284,20 @@ export const pwnedPasswordTool: ToolDefinition = {
       type: 'text',
       placeholder: 'Enter password to check...',
       required: true,
-      helperText: 'CyberKit sends this password to the local backend route, hashes it with SHA-1 there, and sends only the first 5 hash characters to HIBP.',
+      helperText: 'The password is SHA-1 hashed in your browser. Only the hash prefix and suffix are sent to CyberKit.',
     },
   ],
   execute: async (inputs) => {
     const password = asString(inputs.password, 'Password', 1024);
+    const sha1 = (await hashViaWebCrypto('SHA-1', password)).toUpperCase();
+    const hashPrefix = sha1.slice(0, 5);
+    const hashSuffix = sha1.slice(5);
 
     try {
       const response = await fetch('/api/pwned-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ hashPrefix, hashSuffix }),
       });
 
       const resData = await response.json();
@@ -321,7 +324,7 @@ Seen count: ${resData.breachCount.toLocaleString()}
         data: resData,
         rawOutput: raw,
         severity: resData.pwned ? 'critical' : 'info',
-        explanation: 'The Pwned Passwords range API uses k-anonymity. CyberKit hashes the password server-side, sends only the first 5 SHA-1 characters to the API, then checks whether the returned suffix list contains the full hash suffix.',
+        explanation: 'The Pwned Passwords range API uses k-anonymity. CyberKit hashes the password in the browser, sends only the first 5 SHA-1 characters to HIBP through the backend, then checks whether the returned suffix list contains the remaining hash suffix.',
         items: [
           { label: 'Pwned', value: resData.pwned ? 'YES' : 'No', status: resData.pwned ? 'fail' : 'pass' },
           { label: 'Seen Count', value: resData.breachCount.toLocaleString(), status: resData.pwned ? 'fail' : 'pass' },

@@ -8,6 +8,7 @@ import {
   jsonError,
   parseJsonBody,
   rateLimitResponse,
+  resolveAndBlockPrivateIp,
   TIMEOUTS,
 } from '@/lib/server/scanner';
 
@@ -15,6 +16,8 @@ interface TlsResult {
   cert: ExtendedPeerCertificate;
   protocol: string | null;
   cipher: tls.CipherNameAndProtocol;
+  authorized: boolean;
+  authorizationError: string | null;
 }
 
 type ExtendedPeerCertificate = tls.DetailedPeerCertificate & {
@@ -30,11 +33,12 @@ interface Finding {
   scoreDeduction: number;
 }
 
-function getCertificateInfo(hostname: string): Promise<TlsResult> {
+async function getCertificateInfo(hostname: string): Promise<TlsResult> {
+  const [address] = await resolveAndBlockPrivateIp(hostname);
   return new Promise((resolve, reject) => {
     const socket = tls.connect(
       {
-        host: hostname,
+        host: address,
         port: 443,
         servername: hostname,
         rejectUnauthorized: false,
@@ -43,6 +47,8 @@ function getCertificateInfo(hostname: string): Promise<TlsResult> {
         const cert = socket.getPeerCertificate(true);
         const protocol = socket.getProtocol();
         const cipher = socket.getCipher();
+        const authorized = socket.authorized;
+        const authorizationError = socket.authorizationError ? String(socket.authorizationError) : null;
 
         if (!cert || Object.keys(cert).length === 0) {
           socket.destroy();
@@ -51,7 +57,7 @@ function getCertificateInfo(hostname: string): Promise<TlsResult> {
         }
 
         socket.destroy();
-        resolve({ cert: cert as ExtendedPeerCertificate, protocol, cipher });
+        resolve({ cert: cert as ExtendedPeerCertificate, protocol, cipher, authorized, authorizationError });
       }
     );
 
@@ -75,7 +81,7 @@ export async function POST(request: Request) {
     }
 
     const cleanHost = await assertPublicHostname(body.hostname);
-    const rate = consumeRateLimit(request, cleanHost, {
+    const rate = await consumeRateLimit(request, cleanHost, {
       endpoint: 'ssl',
       ipLimit: 20,
       targetLimit: 5,
@@ -97,7 +103,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { cert, protocol, cipher } = resultData;
+    const { cert, protocol, cipher, authorized, authorizationError } = resultData;
     const validFrom = cert.valid_from ? new Date(cert.valid_from) : null;
     const validTo = cert.valid_to ? new Date(cert.valid_to) : null;
     const now = new Date();
@@ -190,12 +196,14 @@ export async function POST(request: Request) {
     }
 
     let trustSafety: 'pass' | 'warn' | 'fail' = 'pass';
-    if (isSelfSigned) {
+    if (!authorized || isSelfSigned) {
       score -= 40;
       trustSafety = 'fail';
       findings.push({
-        rule: 'Self-Signed Certificate',
-        impact: 'Certificate is self-signed and not trusted by standard web root certificates.',
+        rule: isSelfSigned ? 'Self-Signed Certificate' : 'Certificate Trust Chain Error',
+        impact: isSelfSigned
+          ? 'Certificate is self-signed and not trusted by standard web root certificates.'
+          : `Certificate trust validation failed: ${authorizationError || 'Unknown authorization error'}.`,
         severity: 'high',
         scoreDeduction: 40,
       });
@@ -235,6 +243,8 @@ export async function POST(request: Request) {
           }
         : null,
       sigalg,
+      authorized,
+      authorizationError,
       isSelfSigned,
       ca: cert.ca || false,
       subjectaltname: cert.subjectaltname || null,

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     const targetUrl = normalizeTargetUrl(body.url);
     await resolveAndBlockPrivateIp(targetUrl.hostname);
 
-    const rate = consumeRateLimit(request, targetUrl.hostname, {
+    const rate = await consumeRateLimit(request, targetUrl.hostname, {
       endpoint: 'security-txt',
       ipLimit: 40,
       targetLimit: 12,

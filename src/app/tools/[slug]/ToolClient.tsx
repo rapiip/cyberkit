@@ -1,23 +1,25 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   Play, Copy, Download, Check, ArrowLeft, Cpu, AlertTriangle,
   ChevronRight, FileText, Code, Info,
 } from 'lucide-react';
-import { getToolBySlug, allTools } from '@/lib/tools/registry';
-import { getCategoryById } from '@/lib/tools/categories';
 import { useHistoryStore } from '@/lib/store';
 import type { ToolResult, ToolInput } from '@/lib/tools/types';
+import type { ToolMetadata } from '@/lib/tools/metadata';
 
-export default function ToolClient({ slug }: { slug: string }) {
-  const tool = getToolBySlug(slug);
-  if (!tool) notFound();
-
-  const category = getCategoryById(tool.category);
+export default function ToolClient({
+  tool,
+  relatedTools,
+  categoryName,
+}: {
+  tool: ToolMetadata;
+  relatedTools: ToolMetadata[];
+  categoryName: string;
+}) {
   const [formValues, setFormValues] = useState<Record<string, unknown>>(() => {
     const defaults: Record<string, unknown> = {};
     tool.inputs.forEach((input) => {
@@ -38,7 +40,10 @@ export default function ToolClient({ slug }: { slug: string }) {
     setRunning(true);
     setResult(null);
     try {
-      const res = await tool.execute(formValues);
+      const { getToolBySlug } = await import('@/lib/tools/registry');
+      const executableTool = getToolBySlug(tool.slug);
+      if (!executableTool) throw new Error('Tool executor is unavailable.');
+      const res = await executableTool.execute(formValues);
       setResult(res);
       setActiveTab('summary');
       // Save to history
@@ -162,10 +167,6 @@ export default function ToolClient({ slug }: { slug: string }) {
         );
     }
   };
-
-  const relatedTools = allTools
-    .filter((t) => t.category === tool.category && t.id !== tool.id)
-    .slice(0, 4);
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
@@ -336,7 +337,7 @@ export default function ToolClient({ slug }: { slug: string }) {
       {relatedTools.length > 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="mt-8">
           <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
-            More {category?.name || 'Related'} Tools
+            More {categoryName} Tools
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {relatedTools.map((t) => (

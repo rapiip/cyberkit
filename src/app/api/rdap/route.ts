@@ -112,7 +112,7 @@ export async function POST(request: Request) {
     }
 
     const domain = await assertPublicHostname(body.hostname);
-    const rate = consumeRateLimit(request, domain, {
+    const rate = await consumeRateLimit(request, domain, {
       endpoint: 'rdap',
       ipLimit: 25,
       targetLimit: 5,

@@ -125,7 +125,7 @@ export async function POST(request: Request) {
       return errorResponse('Invalid CVE ID or keyword provided', 400, 'INVALID_CVE_QUERY');
     }
 
-    const rate = consumeRateLimit(request, query.toLowerCase(), {
+    const rate = await consumeRateLimit(request, query.toLowerCase(), {
       endpoint: 'cve',
       ipLimit: 25,
       targetLimit: 5,

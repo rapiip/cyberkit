@@ -1,4 +1,6 @@
 import dns from 'dns';
+import http from 'http';
+import https from 'https';
 import net from 'net';
 import { NextResponse } from 'next/server';
 import { domainToASCII } from 'url';
@@ -20,6 +22,65 @@ interface CacheEntry<T> {
 }
 
 const memoryCache = new Map<string, CacheEntry<unknown>>();
+const memoryCounters = new Map<string, CacheEntry<number>>();
+const MEMORY_MAX_KEYS = 2_000;
+
+function boundedSet<T>(store: Map<string, CacheEntry<T>>, key: string, value: CacheEntry<T>) {
+  if (store.size >= MEMORY_MAX_KEYS) {
+    const now = Date.now();
+    for (const [entryKey, entry] of store) {
+      if (entry.expiresAt <= now || store.size >= MEMORY_MAX_KEYS) store.delete(entryKey);
+      if (store.size < MEMORY_MAX_KEYS) break;
+    }
+  }
+  store.set(key, value);
+}
+
+function upstashConfig() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  return url && token ? { url: url.replace(/\/$/, ''), token } : null;
+}
+
+async function upstashCommand<T>(command: unknown[]) {
+  const config = upstashConfig();
+  if (!config) return null;
+
+  const response = await fetch(`${config.url}/pipeline`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify([command]),
+  });
+
+  if (!response.ok) throw new Error(`Upstash Redis returned HTTP ${response.status}`);
+  const payload = (await response.json()) as [{ result?: T; error?: string }];
+  if (payload[0]?.error) throw new Error(payload[0].error);
+  return payload[0]?.result ?? null;
+}
+
+async function upstashPipeline(commands: unknown[][]) {
+  const config = upstashConfig();
+  if (!config) return null;
+
+  const response = await fetch(`${config.url}/pipeline`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(commands),
+  });
+
+  if (!response.ok) throw new Error(`Upstash Redis returned HTTP ${response.status}`);
+  return (await response.json()) as { result?: unknown; error?: string }[];
+}
+
+function keyPart(value: string) {
+  return Buffer.from(value).toString('base64url').slice(0, 160);
+}
 
 export class PublicTargetError extends Error {
   status: number;
@@ -82,11 +143,25 @@ export function errorResponse(
 
 export async function cachedJson<T>(key: string, ttlMs: number, producer: () => Promise<T>) {
   const now = Date.now();
+  const redisKey = `cyberkit:cache:${keyPart(key)}`;
+
+  try {
+    const external = await upstashCommand<string>(['GET', redisKey]);
+    if (external) return JSON.parse(external) as T;
+  } catch {
+    // Local memory cache remains the fallback when Redis is unavailable.
+  }
+
   const cached = memoryCache.get(key) as CacheEntry<T> | undefined;
   if (cached && cached.expiresAt > now) return cached.value;
 
   const value = await producer();
-  memoryCache.set(key, { value, expiresAt: now + ttlMs });
+  boundedSet(memoryCache, key, { value, expiresAt: now + ttlMs });
+  try {
+    await upstashCommand(['SET', redisKey, JSON.stringify(value), 'PX', ttlMs]);
+  } catch {
+    // Caching must never fail the user-facing lookup.
+  }
   return value;
 }
 
@@ -211,10 +286,13 @@ export async function resolveAndBlockPrivateIp(hostname: string, timeoutMs = TIM
   }
 
   const lookup = dnsPromises.lookup(host, { all: true, verbatim: true });
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new PublicTargetError('DNS resolution timed out', 504, 'DNS_TIMEOUT', true)), timeoutMs);
+    timeoutId = setTimeout(() => reject(new PublicTargetError('DNS resolution timed out', 504, 'DNS_TIMEOUT', true)), timeoutMs);
   });
-  const records = await Promise.race([lookup, timeout]);
+  const records = await Promise.race([lookup, timeout]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
   const addresses = records.map((record) => record.address);
   if (!addresses.length) throw new PublicTargetError('Hostname did not resolve', 404);
   if (addresses.some(isPrivateIp)) {
@@ -232,15 +310,7 @@ export async function assertPublicHostname(hostname: string) {
 export async function fetchPublicHttp(url: URL, init: RequestInit = {}, timeoutMs = TIMEOUTS.httpMs, maxRedirects = 4) {
   let current = new URL(url);
   for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
-    await resolveAndBlockPrivateIp(current.hostname);
-    const response = await fetchWithTimeout(
-      current,
-      {
-        ...init,
-        redirect: 'manual',
-      },
-      timeoutMs
-    );
+    const response = await requestPublicHttp(current, init, timeoutMs);
 
     if (![301, 302, 303, 307, 308].includes(response.status)) return response;
     const location = response.headers.get('location');
@@ -251,6 +321,70 @@ export async function fetchPublicHttp(url: URL, init: RequestInit = {}, timeoutM
   throw new PublicTargetError('Too many redirects from target', 508);
 }
 
+function responseHeadersFromNode(headers: http.IncomingHttpHeaders) {
+  const result = new Headers();
+  for (const [key, value] of Object.entries(headers)) {
+    if (Array.isArray(value)) value.forEach((item) => result.append(key, item));
+    else if (value !== undefined) result.set(key, String(value));
+  }
+  return result;
+}
+
+async function requestPublicHttp(targetUrl: URL, init: RequestInit, timeoutMs: number) {
+  const addresses = await resolveAndBlockPrivateIp(targetUrl.hostname);
+  const address = addresses[0];
+  const isHttps = targetUrl.protocol === 'https:';
+  const port = Number(targetUrl.port || (isHttps ? 443 : 80));
+  const method = init.method || 'GET';
+  const requestHeaders = new Headers(init.headers);
+  requestHeaders.set('Host', targetUrl.host);
+
+  const options: http.RequestOptions & https.RequestOptions = {
+    host: address,
+    port,
+    method,
+    path: `${targetUrl.pathname}${targetUrl.search}`,
+    headers: Object.fromEntries(requestHeaders.entries()),
+    timeout: timeoutMs,
+  };
+
+  if (isHttps) {
+    options.servername = targetUrl.hostname;
+    options.rejectUnauthorized = false;
+  }
+
+  const body =
+    typeof init.body === 'string' || init.body instanceof Buffer
+      ? init.body
+      : init.body instanceof URLSearchParams
+        ? init.body.toString()
+        : undefined;
+
+  return new Promise<Response>((resolve, reject) => {
+    const transport = isHttps ? https : http;
+    const req = transport.request(options, (res) => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('end', () => {
+        const response = new Response(Buffer.concat(chunks), {
+          status: res.statusCode || 0,
+          statusText: res.statusMessage,
+          headers: responseHeadersFromNode(res.headers),
+        });
+        Object.defineProperty(response, 'url', { value: targetUrl.toString() });
+        resolve(response);
+      });
+    });
+
+    req.on('timeout', () => {
+      req.destroy(new PublicTargetError('HTTP request timed out', 504, 'HTTP_TIMEOUT', true));
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
 interface RateLimitOptions {
   endpoint: string;
   ipLimit?: number;
@@ -259,47 +393,70 @@ interface RateLimitOptions {
   cooldownMs?: number;
 }
 
-const rateBuckets = new Map<string, number[]>();
-const cooldownBuckets = new Map<string, number>();
-
 export function clientIpFromRequest(request: Request) {
-  const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  return (
-    forwarded ||
-    request.headers.get('x-real-ip') ||
-    request.headers.get('cf-connecting-ip') ||
-    'local'
-  );
+  if (process.env.CYBERKIT_TRUST_PROXY_HEADERS === 'true') {
+    const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+    const proxyIp = forwarded || request.headers.get('x-real-ip') || request.headers.get('cf-connecting-ip');
+    if (proxyIp && net.isIP(proxyIp)) return proxyIp;
+  }
+  return 'local';
 }
 
-function hitBucket(key: string, limit: number, windowMs: number) {
+async function hitBucket(key: string, limit: number, windowMs: number) {
   const now = Date.now();
-  const bucket = (rateBuckets.get(key) || []).filter((timestamp) => now - timestamp < windowMs);
-  bucket.push(now);
-  rateBuckets.set(key, bucket);
-  return bucket.length <= limit ? 0 : Math.ceil((windowMs - (now - bucket[0])) / 1000);
+  const externalKey = `cyberkit:rate:${keyPart(key)}`;
+
+  try {
+    const results = await upstashPipeline([
+      ['INCR', externalKey],
+      ['PEXPIRE', externalKey, windowMs],
+      ['PTTL', externalKey],
+    ]);
+    if (results) {
+      const count = Number(results[0]?.result || 0);
+      const ttl = Math.max(0, Number(results[2]?.result || windowMs));
+      return count <= limit ? 0 : Math.ceil(ttl / 1000);
+    }
+  } catch {
+    // Fall back to bounded in-memory counters for local development.
+  }
+
+  const entry = memoryCounters.get(key);
+  const nextValue = entry && entry.expiresAt > now ? entry.value + 1 : 1;
+  const expiresAt = entry && entry.expiresAt > now ? entry.expiresAt : now + windowMs;
+  boundedSet(memoryCounters, key, { value: nextValue, expiresAt });
+  return nextValue <= limit ? 0 : Math.ceil((expiresAt - now) / 1000);
 }
 
-export function consumeRateLimit(request: Request, hostname: string, options: RateLimitOptions) {
+export async function consumeRateLimit(request: Request, hostname: string, options: RateLimitOptions) {
   const now = Date.now();
   const ip = clientIpFromRequest(request);
   const windowMs = options.windowMs ?? 60_000;
-  const ipRetry = hitBucket(`${options.endpoint}:ip:${ip}`, options.ipLimit ?? 30, windowMs);
+  const ipRetry = await hitBucket(`${options.endpoint}:ip:${ip}`, options.ipLimit ?? 30, windowMs);
   if (ipRetry) return { limited: true, retryAfter: ipRetry };
 
   const targetKey = `${options.endpoint}:target:${ip}:${hostname}`;
-  const targetRetry = hitBucket(targetKey, options.targetLimit ?? 10, windowMs);
+  const targetRetry = await hitBucket(targetKey, options.targetLimit ?? 10, windowMs);
   if (targetRetry) return { limited: true, retryAfter: targetRetry };
 
   if (options.cooldownMs) {
     const cooldownKey = `${options.endpoint}:cooldown:${ip}:${hostname}`;
-    const last = cooldownBuckets.get(cooldownKey) || 0;
-    const remaining = options.cooldownMs - (now - last);
+    const cooldown = memoryCounters.get(cooldownKey);
+    const remaining = cooldown && cooldown.expiresAt > now ? cooldown.expiresAt - now : 0;
     if (remaining > 0) return { limited: true, retryAfter: Math.ceil(remaining / 1000) };
-    cooldownBuckets.set(cooldownKey, now);
+    await hitBucket(cooldownKey, 1, options.cooldownMs);
   }
 
   return { limited: false, retryAfter: 0 };
+}
+
+export function getHeaderValues(headers: Headers, name: string) {
+  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+  if (name.toLowerCase() === 'set-cookie' && typeof getSetCookie === 'function') {
+    return getSetCookie.call(headers);
+  }
+  const value = headers.get(name);
+  return value ? [value] : [];
 }
 
 export function rateLimitResponse(retryAfter: number) {

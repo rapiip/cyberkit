@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     }
 
     const hostname = await assertPublicHostname(body.hostname);
-    const rate = consumeRateLimit(request, hostname, {
+    const rate = await consumeRateLimit(request, hostname, {
       endpoint: 'doh',
       ipLimit: 45,
       targetLimit: 15,

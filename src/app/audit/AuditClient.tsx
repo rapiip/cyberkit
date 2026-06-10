@@ -220,17 +220,17 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
   const statusIcon = (status: AuditCheck['status']) => {
     switch (status) {
       case 'pass':
-        return <Check size={16} className="text-emerald-400" />;
+        return <Check size={16} className="text-status-pass" />;
       case 'fail':
-        return <X size={16} className="text-rose-500" />;
+        return <X size={16} className="text-status-fail" />;
       case 'warn':
-        return <AlertTriangle size={16} className="text-amber-500" />;
+        return <AlertTriangle size={16} className="text-status-warn" />;
       case 'running':
         return (
-          <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-cyber-cyan border-t-transparent rounded-full animate-spin" />
         );
       default:
-        return <div className="w-3.5 h-3.5 rounded-full bg-zinc-700" />;
+        return <div className="w-3.5 h-3.5 rounded-full bg-muted" />;
     }
   };
 
@@ -238,24 +238,24 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-bold flex items-center gap-3">
-          <Shield size={32} className="text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" /> 
+          <Shield size={32} className="text-cyber-cyan text-glow-cyan" /> 
           Website Security Audit
         </h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Perform a real-time cybersecurity diagnostic audit on any domain or URL to evaluate security headers and SSL status.
         </p>
       </motion.div>
 
       {/* URL Input Form */}
-      <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800 rounded-xl p-6 shadow-xl">
+      <div className="glass-card p-6">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
-            <Globe size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <Globe size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="e.g. google.com or https://github.com"
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-12 pr-4 py-3 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all"
+              className="input-cyber pl-12 pr-4 py-3 text-sm"
               onKeyDown={(e) => e.key === 'Enter' && runAudit()}
               disabled={running}
             />
@@ -263,11 +263,11 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
           <button
             onClick={runAudit}
             disabled={running || !url.trim()}
-            className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold rounded-lg px-6 py-3 text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+            className="btn-cyber btn-primary px-6 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {running ? (
               <>
-                <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                 Auditing...
               </>
             ) : (
@@ -280,10 +280,10 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
         </div>
 
         {errorMsg && (
-          <div className="mt-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div className="mt-4 p-3 bg-status-fail/10 border border-status-fail/20 text-status-fail text-xs rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <div>
               <div className="font-semibold">{errorMsg}</div>
-              {errorCode && <div className="text-[10px] font-mono text-rose-300/80 mt-1">{errorCode}</div>}
+              {errorCode && <div className="text-[10px] font-mono text-status-fail/80 mt-1">{errorCode}</div>}
             </div>
             {errorRetryable && (
               <button
@@ -303,17 +303,17 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800 rounded-xl p-6 flex flex-col md:flex-row items-center justify-around gap-6 shadow-xl"
+          className="glass-card p-6 flex flex-col md:flex-row items-center justify-around gap-6"
         >
           <div className="text-center md:text-left space-y-2">
-            <h2 className="text-lg font-semibold text-zinc-200">Security Score Summary</h2>
-            <p className="text-xs text-zinc-400 max-w-sm">
+            <h2 className="text-lg font-semibold text-foreground">Security Score Summary</h2>
+            <p className="text-xs text-muted-foreground max-w-sm">
               Audit results indicate key security attributes are active. Review failures and warnings below to strengthen protection against exploits.
             </p>
             <div className="flex gap-4 text-xs font-mono pt-2">
-              <span className="text-emerald-400">{checks.filter((c) => c.status === 'pass').length} Passed</span>
-              <span className="text-amber-400">{checks.filter((c) => c.status === 'warn').length} Warnings</span>
-              <span className="text-rose-500">{checks.filter((c) => c.status === 'fail' || c.status === 'error').length} Failed</span>
+              <span className="text-status-pass">{checks.filter((c) => c.status === 'pass').length} Passed</span>
+              <span className="text-status-warn">{checks.filter((c) => c.status === 'warn').length} Warnings</span>
+              <span className="text-status-fail">{checks.filter((c) => c.status === 'fail' || c.status === 'error').length} Failed</span>
             </div>
             
             <div className="pt-3 flex justify-center md:justify-start">
@@ -330,7 +330,7 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
                     exportAuditToPDF(`Audit: ${targetUrl}`, targetUrl, auditReport);
                   }
                 }}
-                className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-semibold rounded-lg px-4 py-2 text-xs flex items-center gap-2 transition-all hover:shadow-[0_0_10px_rgba(6,182,212,0.2)]"
+                className="btn-cyber btn-secondary btn-sm"
               >
                 <FileDown size={14} /> Export PDF Report
               </button>
@@ -342,17 +342,17 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
             <div className="relative flex items-center justify-center">
               {/* Outer Score Circle */}
               <svg className="w-24 h-24 transform -rotate-90">
-                <circle cx="48" cy="48" r="40" className="stroke-zinc-800 fill-none" strokeWidth="6" />
+                <circle cx="48" cy="48" r="40" className="stroke-muted fill-none" strokeWidth="6" />
                 <circle
                   cx="48"
                   cy="48"
                   r="40"
                   className={`fill-none transition-all duration-1000 ${
                     grade === 'A' || grade === 'B'
-                      ? 'stroke-emerald-400'
+                      ? 'stroke-status-pass'
                       : grade === 'C'
-                      ? 'stroke-amber-400'
-                      : 'stroke-rose-500'
+                      ? 'stroke-status-warn'
+                      : 'stroke-status-fail'
                   }`}
                   strokeWidth="6"
                   strokeDasharray="251.2"
@@ -360,8 +360,8 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
                 />
               </svg>
               <div className="absolute flex flex-col items-center">
-                <span className="text-2xl font-bold text-zinc-100">{score}</span>
-                <span className="text-[10px] text-zinc-500 font-mono">SCORE</span>
+                <span className="text-2xl font-bold text-foreground">{score}</span>
+                <span className="text-[10px] text-muted-foreground font-mono">SCORE</span>
               </div>
             </div>
 
@@ -369,17 +369,17 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
               <div
                 className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl font-extrabold font-mono border-2 shadow-lg ${
                   grade === 'A'
-                    ? 'bg-emerald-500/10 border-emerald-400 text-emerald-400 shadow-emerald-500/20'
+                    ? 'bg-status-pass/10 border-status-pass text-status-pass shadow-status-pass/20'
                     : grade === 'B'
-                    ? 'bg-emerald-600/10 border-emerald-500 text-emerald-500 shadow-emerald-600/10'
+                    ? 'bg-status-pass/10 border-status-pass text-status-pass shadow-status-pass/10'
                     : grade === 'C'
-                    ? 'bg-amber-500/10 border-amber-400 text-amber-400 shadow-amber-500/20'
-                    : 'bg-rose-500/10 border-rose-500 text-rose-500 shadow-rose-500/20'
+                    ? 'bg-status-warn/10 border-status-warn text-status-warn shadow-status-warn/20'
+                    : 'bg-status-fail/10 border-status-fail text-status-fail shadow-status-fail/20'
                 }`}
               >
                 {grade}
               </div>
-              <span className="text-[10px] text-zinc-500 font-mono mt-1 block">GRADE</span>
+              <span className="text-[10px] text-muted-foreground font-mono mt-1 block">GRADE</span>
             </div>
           </div>
         </motion.div>
@@ -387,10 +387,10 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
 
       {/* Diagnostic Check Results List */}
       {checks.length > 0 && (
-        <div className="bg-zinc-900/50 backdrop-blur-md border border-zinc-800 rounded-xl overflow-hidden shadow-xl divide-y divide-zinc-800">
-          <div className="bg-zinc-950 px-6 py-4 flex items-center justify-between border-b border-zinc-800">
-            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Diagnostic Checklist</span>
-            <span className="text-xs text-zinc-500 font-mono">
+        <div className="glass-card overflow-hidden divide-y divide-border">
+          <div className="bg-surface px-6 py-4 flex items-center justify-between border-b border-border">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Diagnostic Checklist</span>
+            <span className="text-xs text-muted-foreground font-mono">
               {checks.filter((c) => c.status !== 'pending' && c.status !== 'running').length} / {checks.length} complete
             </span>
           </div>
@@ -401,7 +401,7 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.05 }}
-              className={`flex items-start gap-4 px-6 py-4 hover:bg-zinc-950/30 transition-colors ${
+              className={`flex items-start gap-4 px-6 py-4 hover:bg-surface-hover/30 transition-colors ${
                 check.status === 'pending' || check.status === 'running' ? 'animate-pulse' : ''
               }`}
             >
@@ -409,26 +409,26 @@ ${c.details ? `* **Technical context**: *${c.details}*` : ''}
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-zinc-200">{check.name}</span>
+                  <span className="text-sm font-semibold text-foreground">{check.name}</span>
                   <span
                     className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${
                       check.status === 'pass'
-                        ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
+                        ? 'bg-status-pass/5 border-status-pass/20 text-status-pass'
                         : check.status === 'fail'
-                        ? 'bg-rose-500/5 border-rose-500/20 text-rose-400'
+                        ? 'bg-status-fail/5 border-status-fail/20 text-status-fail'
                         : check.status === 'warn'
-                        ? 'bg-amber-500/5 border-amber-500/20 text-amber-400'
+                        ? 'bg-status-warn/5 border-status-warn/20 text-status-warn'
                         : check.status === 'running'
-                        ? 'bg-cyan-500/5 border-cyan-500/20 text-cyan-400'
-                        : 'bg-zinc-800/30 border-zinc-700 text-zinc-400'
+                        ? 'bg-cyber-cyan/5 border-cyber-cyan/20 text-cyber-cyan'
+                        : 'bg-muted/30 border-border text-muted-foreground'
                     }`}
                   >
                     {check.status}
                   </span>
                 </div>
-                <p className="text-xs text-zinc-400 mt-0.5">{check.message}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{check.message}</p>
                 {check.details && (
-                  <p className="text-[11px] font-mono text-zinc-500 mt-1 pl-2 border-l border-zinc-800">
+                  <p className="text-[11px] font-mono text-muted-foreground mt-1 pl-2 border-l border-border">
                     {check.details}
                   </p>
                 )}
