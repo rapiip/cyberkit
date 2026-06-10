@@ -2,14 +2,20 @@
   "name": "cyberkit-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "prebuild": "node scripts/clean-next-dev-types.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "pretypecheck": "node scripts/clean-next-dev-types.mjs",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test tests/**/*.test.ts",
-    "test:registry": "tsx --test tests/tool-registry.test.ts"
+    "test:registry": "tsx --test tests/tool-registry.test.ts",
+    "verify": "npm run lint && npm test && npm run build && npm audit --audit-level=moderate"
   },
   "dependencies": {
     "@types/react-syntax-highlighter": "^15.5.13",

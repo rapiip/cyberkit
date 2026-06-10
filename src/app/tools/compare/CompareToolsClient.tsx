@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeftRight, ArrowRight } from 'lucide-react';
 import { getToolsByCategory } from '@/lib/tools/registry';
+import StatePanel from '@/components/ui/StatePanel';
 import type { ToolDefinition } from '@/lib/tools/types';
 
 function getErrorMessage(error: unknown) {
@@ -108,10 +109,10 @@ export default function CompareToolsPage() {
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-bold flex items-center gap-3">
-          <ArrowLeftRight className="text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
+          <ArrowLeftRight className="text-cyber-cyan" />
           Compare Tools Workspace
         </h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Open two data transformation tools side-by-side. Pipe outputs directly to inputs to decode, solve multi-layered ciphers, and inspect CTF payloads in real-time.
         </p>
       </motion.div>
@@ -120,10 +121,10 @@ export default function CompareToolsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* ================= LEFT SIDE WORKSPACE ================= */}
-        <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-5 flex flex-col justify-between">
+        <div className="glass-card p-6 space-y-5 flex flex-col justify-between">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Workspace Panel Left</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace Panel Left</span>
               
               {/* Tool Selector */}
               <select
@@ -133,7 +134,7 @@ export default function CompareToolsPage() {
                   setLeftOutput('');
                   setLeftSuccess(false);
                 }}
-                className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-cyan-400"
+                className="input-cyber py-1 text-xs"
               >
                 {compareTools.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
@@ -146,11 +147,11 @@ export default function CompareToolsPage() {
                 {/* Dynamic Mode option if tool supports it */}
                 {leftTool.inputs.find(i => i.id === 'mode') && (
                   <div>
-                    <label className="block text-[10px] uppercase font-mono text-zinc-500 mb-1.5">Mode</label>
+                    <label className="block text-[10px] uppercase font-mono text-muted-foreground mb-1.5">Mode</label>
                     <select
                       value={leftMode}
                       onChange={(e) => setLeftMode(e.target.value)}
-                      className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1 text-xs text-zinc-300 focus:outline-none focus:border-cyan-400"
+                      className="input-cyber py-1 text-xs"
                     >
                       {leftTool.inputs.find(i => i.id === 'mode')?.options?.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -161,20 +162,20 @@ export default function CompareToolsPage() {
 
                 {/* Input Textarea */}
                 <div>
-                  <label className="block text-[10px] uppercase font-mono text-zinc-500 mb-1.5">Input Text</label>
+                  <label className="block text-[10px] uppercase font-mono text-muted-foreground mb-1.5">Input Text</label>
                   <textarea
                     value={leftInput}
                     onChange={(e) => setLeftInput(e.target.value)}
                     placeholder="Type or paste text..."
                     rows={4}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs text-zinc-200 font-mono placeholder-zinc-700 focus:outline-none focus:border-cyan-400"
+                    className="input-cyber p-3 text-xs"
                   />
                 </div>
 
                 {/* Run Button */}
                 <button
                   onClick={runLeft}
-                  className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-semibold rounded-lg px-4 py-2 text-xs transition-all hover:shadow-[0_0_10px_rgba(6,182,212,0.2)]"
+                  className="btn-cyber btn-secondary btn-sm text-cyber-cyan border-cyber-cyan/30"
                 >
                   Execute Left
                 </button>
@@ -183,14 +184,15 @@ export default function CompareToolsPage() {
           </div>
 
           {/* Results Output Block Left */}
-          <div className="space-y-3 pt-4 border-t border-zinc-800/60">
+          <div className="space-y-3 pt-4 border-t border-border">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Output Results</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Output Results</span>
               {leftOutput && (
                 <button
                   onClick={sendLeftToRight}
-                  className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 bg-cyan-950/20 px-2 py-0.5 rounded border border-cyan-950"
+                  className="text-xs text-cyber-cyan hover:text-foreground font-semibold flex items-center gap-1 bg-cyber-cyan/10 px-2 py-0.5 rounded border border-cyber-cyan/20"
                   title="Pipe output to right panel input"
+                  aria-label="Pipe left output to right input"
                 >
                   Pipe Right <ArrowRight size={12} />
                 </button>
@@ -198,28 +200,24 @@ export default function CompareToolsPage() {
             </div>
 
             {leftError && (
-              <div className="p-3 bg-rose-500/5 border border-rose-500/15 text-rose-400 text-xs rounded-lg">
-                {leftError}
-              </div>
+              <StatePanel icon={<ArrowLeftRight size={20} />} title="Left execution failed" description={leftError} tone="error" />
             )}
 
             {leftSuccess ? (
-              <pre className="p-4 bg-zinc-950 border border-zinc-850 rounded-lg font-mono text-xs text-emerald-400 overflow-x-auto min-h-[100px] max-h-[180px]">
+              <pre className="p-4 bg-surface border border-border rounded-lg font-mono text-xs text-status-pass overflow-x-auto min-h-[100px] max-h-[180px]">
                 {leftOutput || 'No output.'}
               </pre>
-            ) : (
-              <div className="p-8 border border-dashed border-zinc-800 rounded-lg text-center text-zinc-600 text-xs font-mono py-12">
-                Execute tool above to compute results.
-              </div>
+            ) : !leftError && (
+              <StatePanel icon={<ArrowLeftRight size={20} />} title="No left output" description="Execute the left tool to compute results." />
             )}
           </div>
         </div>
 
         {/* ================= RIGHT SIDE WORKSPACE ================= */}
-        <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 space-y-5 flex flex-col justify-between">
+        <div className="glass-card p-6 space-y-5 flex flex-col justify-between">
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Workspace Panel Right</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace Panel Right</span>
               
               {/* Tool Selector */}
               <select
@@ -229,7 +227,7 @@ export default function CompareToolsPage() {
                   setRightOutput('');
                   setRightSuccess(false);
                 }}
-                className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-cyan-400"
+                className="input-cyber py-1 text-xs"
               >
                 {compareTools.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
@@ -242,11 +240,11 @@ export default function CompareToolsPage() {
                 {/* Dynamic Mode option if tool supports it */}
                 {rightTool.inputs.find(i => i.id === 'mode') && (
                   <div>
-                    <label className="block text-[10px] uppercase font-mono text-zinc-500 mb-1.5">Mode</label>
+                    <label className="block text-[10px] uppercase font-mono text-muted-foreground mb-1.5">Mode</label>
                     <select
                       value={rightMode}
                       onChange={(e) => setRightMode(e.target.value)}
-                      className="bg-zinc-950 border border-zinc-800 rounded px-2.5 py-1 text-xs text-zinc-300 focus:outline-none focus:border-cyan-400"
+                      className="input-cyber py-1 text-xs"
                     >
                       {rightTool.inputs.find(i => i.id === 'mode')?.options?.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -257,20 +255,20 @@ export default function CompareToolsPage() {
 
                 {/* Input Textarea */}
                 <div>
-                  <label className="block text-[10px] uppercase font-mono text-zinc-500 mb-1.5">Input Text</label>
+                  <label className="block text-[10px] uppercase font-mono text-muted-foreground mb-1.5">Input Text</label>
                   <textarea
                     value={rightInput}
                     onChange={(e) => setRightInput(e.target.value)}
                     placeholder="Type or paste text..."
                     rows={4}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs text-zinc-200 font-mono placeholder-zinc-700 focus:outline-none focus:border-cyan-400"
+                    className="input-cyber p-3 text-xs"
                   />
                 </div>
 
                 {/* Run Button */}
                 <button
                   onClick={runRight}
-                  className="bg-cyan-500/10 hover:bg-cyan-400/20 text-cyan-400 border border-cyan-500/30 font-semibold rounded-lg px-4 py-2 text-xs transition-all hover:shadow-[0_0_10px_rgba(6,182,212,0.2)]"
+                  className="btn-cyber btn-secondary btn-sm text-cyber-cyan border-cyber-cyan/30"
                 >
                   Execute Right
                 </button>
@@ -279,14 +277,15 @@ export default function CompareToolsPage() {
           </div>
 
           {/* Results Output Block Right */}
-          <div className="space-y-3 pt-4 border-t border-zinc-800/60">
+          <div className="space-y-3 pt-4 border-t border-border">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Output Results</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Output Results</span>
               {rightOutput && (
                 <button
                   onClick={sendRightToLeft}
-                  className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 bg-cyan-950/20 px-2 py-0.5 rounded border border-cyan-950"
+                  className="text-xs text-cyber-cyan hover:text-foreground font-semibold flex items-center gap-1 bg-cyber-cyan/10 px-2 py-0.5 rounded border border-cyber-cyan/20"
                   title="Pipe output to left panel input"
+                  aria-label="Pipe right output to left input"
                 >
                   <ArrowLeftRight size={12} /> Pipe Left
                 </button>
@@ -294,19 +293,15 @@ export default function CompareToolsPage() {
             </div>
 
             {rightError && (
-              <div className="p-3 bg-rose-500/5 border border-rose-500/15 text-rose-400 text-xs rounded-lg">
-                {rightError}
-              </div>
+              <StatePanel icon={<ArrowLeftRight size={20} />} title="Right execution failed" description={rightError} tone="error" />
             )}
 
             {rightSuccess ? (
-              <pre className="p-4 bg-zinc-950 border border-zinc-850 rounded-lg font-mono text-xs text-emerald-400 overflow-x-auto min-h-[100px] max-h-[180px]">
+              <pre className="p-4 bg-surface border border-border rounded-lg font-mono text-xs text-status-pass overflow-x-auto min-h-[100px] max-h-[180px]">
                 {rightOutput || 'No output.'}
               </pre>
-            ) : (
-              <div className="p-8 border border-dashed border-zinc-800 rounded-lg text-center text-zinc-600 text-xs font-mono py-12">
-                Execute tool above to compute results.
-              </div>
+            ) : !rightError && (
+              <StatePanel icon={<ArrowLeftRight size={20} />} title="No right output" description="Execute the right tool to compute results." />
             )}
           </div>
         </div>

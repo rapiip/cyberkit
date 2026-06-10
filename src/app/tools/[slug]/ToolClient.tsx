@@ -182,7 +182,7 @@ export default function ToolClient({
       {/* Tool Header */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <div className="flex items-start gap-4 flex-wrap">
-          <Link href="/tools" className="btn-cyber btn-ghost p-2 rounded-lg">
+          <Link href="/tools" className="btn-cyber btn-ghost p-2 rounded-lg" title="Back to tools" aria-label="Back to tools">
             <ArrowLeft size={18} />
           </Link>
           <div className="flex-1">
@@ -252,11 +252,11 @@ export default function ToolClient({
               </h2>
               {result && (
                 <div className="flex items-center gap-2">
-                  <button onClick={handleCopy} className="btn-cyber btn-ghost btn-sm">
+                  <button onClick={handleCopy} className="btn-cyber btn-ghost btn-sm" title="Copy raw output" aria-label="Copy raw output">
                     {copied ? <Check size={14} className="text-cyber-green" /> : <Copy size={14} />}
                     {copied ? 'Copied!' : 'Copy'}
                   </button>
-                  <button onClick={handleExport} className="btn-cyber btn-ghost btn-sm">
+                  <button onClick={handleExport} className="btn-cyber btn-ghost btn-sm" title="Export raw output" aria-label="Export raw output">
                     <Download size={14} /> Export
                   </button>
                 </div>

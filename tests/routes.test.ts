@@ -41,6 +41,57 @@ test('pwned password route rejects plaintext password payloads', async () => {
   assert.equal(data.errorCode, 'INVALID_HASH_RANGE');
 });
 
+test('pwned password route returns mocked HIBP range match', async () => {
+  const originalFetch = globalThis.fetch;
+  const hashPrefix = 'ABCDE';
+  const hashSuffix = '1234567890ABCDEF1234567890ABCDEF123';
+
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    assert.equal(String(input), `https://api.pwnedpasswords.com/range/${hashPrefix}`);
+    return new Response(`${hashSuffix}:42\n00000000000000000000000000000000000:1`, {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  }) as typeof fetch;
+
+  try {
+    const response = await pwnedPasswordPost(jsonRequest({ hashPrefix, hashSuffix }));
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(data.success, true);
+    assert.equal(data.provider, 'Have I Been Pwned Pwned Passwords');
+    assert.equal(data.pwned, true);
+    assert.equal(data.breachCount, 42);
+    assert.equal(data.hashPrefix, hashPrefix);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('pwned password route returns mocked HIBP range miss', async () => {
+  const originalFetch = globalThis.fetch;
+  const hashPrefix = 'BCDEF';
+  const hashSuffix = '1234567890ABCDEF1234567890ABCDEF124';
+
+  globalThis.fetch = (async () => {
+    return new Response('00000000000000000000000000000000000:1', {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain' },
+    });
+  }) as typeof fetch;
+
+  try {
+    const response = await pwnedPasswordPost(jsonRequest({ hashPrefix, hashSuffix }));
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(data.success, true);
+    assert.equal(data.pwned, false);
+    assert.equal(data.breachCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('sync route reports missing cloud storage configuration', async () => {
   const previousUrl = process.env.UPSTASH_REDIS_REST_URL;
   const previousToken = process.env.UPSTASH_REDIS_REST_TOKEN;

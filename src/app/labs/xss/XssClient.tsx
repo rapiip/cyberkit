@@ -117,33 +117,33 @@ export default function XSSLab() {
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/labs" className="hover:text-zinc-300">Labs</Link>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Link href="/labs" className="hover:text-foreground">Labs</Link>
         <ChevronRight size={12} />
-        <span className="text-zinc-300">XSS Lab</span>
+        <span className="text-foreground">XSS Lab</span>
       </div>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-bold flex items-center gap-3">
-          <FlaskConical className="text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]" /> 
+          <FlaskConical className="text-cyber-amber drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]" /> 
           Cross-Site Scripting (XSS) Lab
         </h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Explore unsafe HTML rendering in a sandbox and learn the controls that prevent client-side script execution.
         </p>
       </motion.div>
 
-      <div className="bg-zinc-950 p-4 flex items-start gap-3 rounded-lg border border-amber-500/20 text-xs">
-        <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-        <span className="text-zinc-400">
-          <strong className="text-amber-500">Safe Sandbox.</strong> No scripts are actually executed against your machine. Celah XSS dianalisis secara sandboxed.
+      <div className="bg-surface p-4 flex items-start gap-3 rounded-lg border border-cyber-amber/20 text-xs">
+        <AlertTriangle size={16} className="text-cyber-amber shrink-0 mt-0.5" />
+        <span className="text-muted-foreground">
+          <strong className="text-cyber-amber">Safe Sandbox.</strong> No scripts are actually executed against your machine. Celah XSS dianalisis secara sandboxed.
         </span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Side: Challenges list */}
         <div className="lg:col-span-4 space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-300">Challenge Tasks</h2>
+          <h2 className="text-sm font-semibold text-foreground">Challenge Tasks</h2>
           <div className="space-y-3">
             {challenges.map((c, i) => (
               <button
@@ -153,21 +153,21 @@ export default function XSSLab() {
                   setResult(null);
                   setInput('');
                 }}
-                className={`w-full text-left bg-zinc-900/40 border rounded-xl p-4 transition-all ${
+                className={`w-full text-left bg-surface border rounded-xl p-4 transition-all ${
                   activeChallenge === i 
-                    ? 'border-amber-500/40 bg-amber-500/5 shadow-[0_0_15px_rgba(245,158,11,0.15)]' 
-                    : 'border-zinc-800 hover:border-zinc-700'
+                    ? 'border-cyber-amber/40 bg-cyber-amber/5 shadow-[0_0_15px_rgba(245,158,11,0.15)]' 
+                    : 'border-border hover:border-border-bright'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                    activeChallenge === i ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-zinc-800 text-zinc-400'
+                    activeChallenge === i ? 'bg-cyber-amber/10 text-cyber-amber border border-cyber-amber/20' : 'bg-muted text-muted-foreground'
                   }`}>
                     Level {c.level}
                   </span>
-                  <span className="text-sm font-medium text-zinc-200">{c.title}</span>
+                  <span className="text-sm font-medium text-foreground">{c.title}</span>
                 </div>
-                <p className="text-xs text-zinc-400 leading-relaxed">{c.hint}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{c.hint}</p>
               </button>
             ))}
           </div>
@@ -175,26 +175,26 @@ export default function XSSLab() {
 
         {/* Right Side: Interactive vulnerable form */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-6">
-            <h2 className="text-sm font-semibold mb-5 flex items-center gap-2 text-zinc-200">
-              <Code size={16} className="text-amber-500" /> Vulnerable Input Field
+          <div className="bg-surface border border-border rounded-xl p-6">
+            <h2 className="text-sm font-semibold mb-5 flex items-center gap-2 text-foreground">
+              <Code size={16} className="text-cyber-amber" /> Vulnerable Input Field
             </h2>
             
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2 block">HTML Training Input</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">HTML Training Input</label>
                 <textarea 
                   value={input} 
                   onChange={e => setInput(e.target.value)} 
                   placeholder="Paste sandbox training markup..." 
                   rows={3}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-xs text-zinc-200 font-mono placeholder-zinc-700 focus:outline-none focus:border-amber-400 transition-all" 
+                  className="w-full bg-surface border border-border rounded-lg p-3 text-xs text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:border-cyber-amber transition-all" 
                 />
               </div>
               
               <button 
                 onClick={handleSubmit} 
-                className="bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-lg w-full py-2.5 text-sm flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+                className="btn-cyber btn-secondary w-full text-sm text-cyber-amber border-cyber-amber/30"
               >
                 <Play size={14} fill="currentColor" /> Submit Input Form
               </button>
@@ -211,28 +211,28 @@ export default function XSSLab() {
                 >
                   <div className={`p-4 rounded-lg flex gap-3 border ${
                     result.success 
-                      ? 'bg-rose-500/10 text-rose-400 border-rose-500/25' 
-                      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25'
+                      ? 'bg-status-fail/10 text-status-fail border-status-fail/25' 
+                      : 'bg-status-pass/10 text-status-pass border-status-pass/25'
                   }`}>
                     {result.success ? <AlertTriangle size={20} className="shrink-0 mt-0.5" /> : <CheckCircle size={20} className="shrink-0 mt-0.5" />}
                     <div className="text-xs space-y-1">
                       <strong className="text-sm font-semibold">{result.success ? 'XSS Payload Active!' : 'Payload Secure'}</strong>
-                      <p className="text-zinc-300">{result.message}</p>
+                      <p className="text-foreground">{result.message}</p>
                     </div>
                   </div>
 
                   {/* Escaped vs Unescaped output comparisons */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                     <div>
-                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-2 block">Vulnerable Output (Renders raw html)</span>
-                      <pre className="p-3 bg-rose-950/15 border border-rose-500/20 text-rose-400 text-xs font-mono rounded-lg overflow-x-auto min-h-[60px]">
+                      <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-2 block">Vulnerable Output (Renders raw html)</span>
+                      <pre className="p-3 bg-status-fail/10 border border-status-fail/20 text-status-fail text-xs font-mono rounded-lg overflow-x-auto min-h-[60px]">
                         {result.output}
                       </pre>
                     </div>
 
                     <div>
-                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-2 block">Secured Output (HTML Encoded)</span>
-                      <pre className="p-3 bg-emerald-950/15 border border-emerald-500/20 text-emerald-400 text-xs font-mono rounded-lg overflow-x-auto min-h-[60px]">
+                      <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-2 block">Secured Output (HTML Encoded)</span>
+                      <pre className="p-3 bg-status-pass/10 border border-status-pass/20 text-status-pass text-xs font-mono rounded-lg overflow-x-auto min-h-[60px]">
                         {result.escapedOutput}
                       </pre>
                     </div>
@@ -243,14 +243,14 @@ export default function XSSLab() {
           </div>
 
           {/* Secure fix comparison info */}
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-6">
+          <div className="bg-surface border border-border rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold flex items-center gap-2 text-zinc-200">
-                <Shield size={16} className="text-emerald-400" /> Secure Fix Comparison
+              <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                <Shield size={16} className="text-status-pass" /> Secure Fix Comparison
               </h2>
               <button 
                 onClick={() => setShowSecure(!showSecure)} 
-                className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold"
+                className="text-xs text-cyber-cyan hover:text-foreground font-semibold"
               >
                 {showSecure ? 'Hide Details' : 'Show Secure Code'}
               </button>
@@ -264,7 +264,7 @@ export default function XSSLab() {
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden space-y-4"
                 >
-                  <pre className="text-xs font-mono p-4 rounded-lg bg-black border border-emerald-500/20 overflow-x-auto text-emerald-400">
+                  <pre className="text-xs font-mono p-4 rounded-lg bg-background border border-status-pass/20 overflow-x-auto text-status-pass">
 {`// ❌ Vulnerable (setting raw innerHTML)
 element.innerHTML = userInput;
 
@@ -281,7 +281,7 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }`}
                   </pre>
-                  <div className="text-xs text-zinc-400 space-y-2 pl-2 border-l border-emerald-500/30">
+                  <div className="text-xs text-muted-foreground space-y-2 pl-2 border-l border-status-pass/30">
                     <p>• <strong>HTML Entity Encoding</strong> neutralizes script tags, angle brackets, and quotes, transforming them into safe literal strings that cannot execute.</p>
                     <p>• <strong>SameSite & HttpOnly</strong> session cookies prevent attackers from accessing credential cookies even if a minor script is injected.</p>
                   </div>
@@ -299,25 +299,25 @@ function escapeHtml(str) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-background/75 backdrop-blur-sm flex items-center justify-center p-4"
           >
             <motion.div 
               initial={{ scale: 0.95, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 20 }}
-              className="bg-zinc-900 border border-zinc-800 rounded-xl max-w-sm w-full p-5 shadow-2xl space-y-4"
+              className="bg-surface border border-border rounded-xl max-w-sm w-full p-5 shadow-2xl space-y-4"
             >
-              <div className="flex items-center gap-3 text-amber-400 font-mono text-sm border-b border-zinc-800 pb-2">
+              <div className="flex items-center gap-3 text-cyber-amber font-mono text-sm border-b border-border pb-2">
                 <Terminal size={18} />
                 <span>localhost:3000 says</span>
               </div>
-              <p className="text-sm font-semibold text-zinc-200 text-center py-2">
+              <p className="text-sm font-semibold text-foreground text-center py-2">
                 &quot;XSS&quot;
               </p>
               <div className="flex justify-end pt-2">
                 <button
                   onClick={() => setShowMockAlert(false)}
-                  className="bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold rounded px-4 py-2 transition-colors font-mono"
+                  className="btn-cyber btn-secondary btn-sm text-cyber-amber border-cyber-amber/30 font-mono"
                 >
                   OK
                 </button>

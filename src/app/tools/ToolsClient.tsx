@@ -144,6 +144,8 @@ function ToolsPageInner() {
                 <button
                   onClick={() => toggleFavorite(tool.id)}
                   className="shrink-0 p-1 rounded hover:bg-surface-hover transition-colors"
+                  title={favorites.includes(tool.id) ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-label={`${favorites.includes(tool.id) ? 'Remove' : 'Add'} ${tool.name} ${favorites.includes(tool.id) ? 'from' : 'to'} favorites`}
                 >
                   <Heart
                     size={14}

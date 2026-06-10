@@ -6,6 +6,7 @@ import { History, Trash2, ExternalLink, Clock } from 'lucide-react';
 import { useHistoryStore } from '@/lib/store';
 import Link from 'next/link';
 import { allTools } from '@/lib/tools/registry';
+import StatePanel from '@/components/ui/StatePanel';
 
 export default function HistoryPage() {
   const { entries, removeEntry, clearHistory, loadFromStorage } = useHistoryStore();
@@ -25,11 +26,12 @@ export default function HistoryPage() {
       </div>
 
       {entries.length === 0 ? (
-        <div className="glass-card p-12 text-center text-muted-foreground">
-          <Clock size={40} className="mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No scan history yet. Run some tools to see results here.</p>
-          <Link href="/tools" className="text-cyber-cyan text-sm mt-2 inline-block hover:underline">Browse Tools →</Link>
-        </div>
+        <StatePanel
+          icon={<Clock size={24} />}
+          title="No scan history"
+          description="Run a tool to save local execution history here."
+          action={<Link href="/tools" className="text-cyber-cyan text-sm hover:underline">Browse Tools</Link>}
+        />
       ) : (
         <div className="space-y-2">
           {entries.map((entry, i) => {
@@ -54,11 +56,11 @@ export default function HistoryPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-[11px] text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</span>
                   {tool && (
-                    <Link href={`/tools/${tool.slug}`} className="btn-cyber btn-ghost btn-sm p-1">
+                    <Link href={`/tools/${tool.slug}`} className="btn-cyber btn-ghost btn-sm p-1" title={`Open ${tool.name}`} aria-label={`Open ${tool.name}`}>
                       <ExternalLink size={12} />
                     </Link>
                   )}
-                  <button onClick={() => removeEntry(entry.id)} className="btn-cyber btn-ghost btn-sm p-1 text-muted-foreground hover:text-cyber-red">
+                  <button onClick={() => removeEntry(entry.id)} className="btn-cyber btn-ghost btn-sm p-1 text-muted-foreground hover:text-cyber-red" title="Delete history entry" aria-label={`Delete history entry for ${entry.toolName}`}>
                     <Trash2 size={12} />
                   </button>
                 </div>

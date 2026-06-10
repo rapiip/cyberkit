@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { FileText, Trash2, Download, Copy, Clock, FileDown, Search, X, Eye } from 'lucide-react';
 import { useReportsStore } from '@/lib/store';
 import { exportAuditToPDF } from '@/lib/utils/export';
+import StatePanel from '@/components/ui/StatePanel';
 import type { SavedReport } from '@/lib/tools/types';
 
 function renderMarkdown(content: string) {
@@ -90,15 +91,17 @@ export default function ReportsPage() {
       )}
 
       {reports.length === 0 ? (
-        <div className="glass-card p-12 text-center text-muted-foreground">
-          <FileText size={40} className="mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No saved reports yet. Run a security audit to generate your first report.</p>
-        </div>
+        <StatePanel
+          icon={<FileText size={24} />}
+          title="No saved reports"
+          description="Run a security audit to generate your first local report."
+        />
       ) : filteredReports.length === 0 ? (
-        <div className="glass-card p-12 text-center text-muted-foreground">
-          <Search size={40} className="mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No reports match the current filters.</p>
-        </div>
+        <StatePanel
+          icon={<Search size={24} />}
+          title="No matching reports"
+          description="Adjust your search or date filter to show saved reports."
+        />
       ) : (
         <div className="space-y-3">
           {filteredReports.map((report, i) => (
@@ -109,12 +112,12 @@ export default function ReportsPage() {
                   <p className="text-xs text-muted-foreground mt-0.5">{report.target}</p>
                 </div>
                  <div className="flex items-center gap-1">
-                  <button onClick={() => setSelectedReport(report)} className="btn-cyber btn-ghost btn-sm p-1" title="View Report"><Eye size={12} /></button>
-                  <button onClick={() => handleCopy(report.content)} className="btn-cyber btn-ghost btn-sm p-1" title="Copy to Clipboard"><Copy size={12} /></button>
-                  <button onClick={() => handleExport(report, 'markdown')} className="btn-cyber btn-ghost btn-sm p-1" title="Download Markdown"><Download size={12} /></button>
-                  <button onClick={() => handleExport(report, 'json')} className="btn-cyber btn-ghost btn-sm p-1" title="Download JSON">JSON</button>
-                  <button onClick={() => exportAuditToPDF(report.title, report.target, report.content)} className="btn-cyber btn-ghost btn-sm p-1 text-cyan-400 hover:bg-cyan-500/10" title="Export to PDF"><FileDown size={12} /></button>
-                  <button onClick={() => removeReport(report.id)} className="btn-cyber btn-ghost btn-sm p-1 text-muted-foreground hover:text-cyber-red" title="Delete Report"><Trash2 size={12} /></button>
+                  <button onClick={() => setSelectedReport(report)} className="btn-cyber btn-ghost btn-sm p-1" title="View report" aria-label={`View report ${report.title}`}><Eye size={12} /></button>
+                  <button onClick={() => handleCopy(report.content)} className="btn-cyber btn-ghost btn-sm p-1" title="Copy report to clipboard" aria-label={`Copy report ${report.title} to clipboard`}><Copy size={12} /></button>
+                  <button onClick={() => handleExport(report, 'markdown')} className="btn-cyber btn-ghost btn-sm p-1" title="Download Markdown" aria-label={`Download ${report.title} as Markdown`}><Download size={12} /></button>
+                  <button onClick={() => handleExport(report, 'json')} className="btn-cyber btn-ghost btn-sm p-1" title="Download JSON" aria-label={`Download ${report.title} as JSON`}>JSON</button>
+                  <button onClick={() => exportAuditToPDF(report.title, report.target, report.content)} className="btn-cyber btn-ghost btn-sm p-1 text-cyber-cyan hover:bg-cyber-cyan/10" title="Export to PDF" aria-label={`Export ${report.title} to PDF`}><FileDown size={12} /></button>
+                  <button onClick={() => removeReport(report.id)} className="btn-cyber btn-ghost btn-sm p-1 text-muted-foreground hover:text-cyber-red" title="Delete report" aria-label={`Delete report ${report.title}`}><Trash2 size={12} /></button>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -139,7 +142,7 @@ export default function ReportsPage() {
                 <h2 className="font-semibold text-sm">{selectedReport.title}</h2>
                 <p className="text-xs text-muted-foreground mt-0.5 break-all">{selectedReport.target}</p>
               </div>
-              <button onClick={() => setSelectedReport(null)} className="btn-cyber btn-ghost btn-sm p-1" title="Close">
+              <button onClick={() => setSelectedReport(null)} className="btn-cyber btn-ghost btn-sm p-1" title="Close" aria-label="Close report preview">
                 <X size={14} />
               </button>
             </div>

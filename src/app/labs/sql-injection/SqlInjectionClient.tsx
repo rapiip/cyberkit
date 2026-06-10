@@ -104,33 +104,33 @@ export default function SQLiLab() {
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/labs" className="hover:text-zinc-300">Labs</Link>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Link href="/labs" className="hover:text-foreground">Labs</Link>
         <ChevronRight size={12} />
-        <span className="text-zinc-300">SQL Injection Lab</span>
+        <span className="text-foreground">SQL Injection Lab</span>
       </div>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-bold flex items-center gap-3">
-          <FlaskConical className="text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]" /> 
+          <FlaskConical className="text-cyber-red drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]" /> 
           SQL Injection Lab
         </h1>
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Study unsafe SQL query construction inside a simulated database login portal.
         </p>
       </motion.div>
 
-      <div className="bg-zinc-950 p-4 flex items-start gap-3 rounded-lg border border-amber-500/20 text-xs">
-        <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
-        <span className="text-zinc-400">
-          <strong className="text-amber-500">Educational Sandbox.</strong> No real databases are impacted. Verify your SQL injection skills below.
+      <div className="bg-surface p-4 flex items-start gap-3 rounded-lg border border-cyber-amber/20 text-xs">
+        <AlertTriangle size={16} className="text-cyber-amber shrink-0 mt-0.5" />
+        <span className="text-muted-foreground">
+          <strong className="text-cyber-amber">Educational Sandbox.</strong> No real databases are impacted. Verify your SQL injection skills below.
         </span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Side: Challenges list */}
         <div className="lg:col-span-4 space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-300">Challenge Tasks</h2>
+          <h2 className="text-sm font-semibold text-foreground">Challenge Tasks</h2>
           <div className="space-y-3">
             {challenges.map((c, i) => (
               <button
@@ -141,21 +141,21 @@ export default function SQLiLab() {
                   setUsername('');
                   setPassword('');
                 }}
-                className={`w-full text-left bg-zinc-900/40 border rounded-xl p-4 transition-all ${
+                className={`w-full text-left bg-surface border rounded-xl p-4 transition-all ${
                   activeChallenge === i 
-                    ? 'border-cyan-400/40 bg-cyan-500/5 shadow-[0_0_15px_rgba(34,211,238,0.15)]' 
-                    : 'border-zinc-800 hover:border-zinc-700'
+                    ? 'border-cyber-cyan/40 bg-cyber-cyan/5 shadow-[0_0_15px_rgba(34,211,238,0.15)]' 
+                    : 'border-border hover:border-border-bright'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                    activeChallenge === i ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'bg-zinc-800 text-zinc-400'
+                    activeChallenge === i ? 'bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/20' : 'bg-muted text-muted-foreground'
                   }`}>
                     Level {c.level}
                   </span>
-                  <span className="text-sm font-medium text-zinc-200">{c.title}</span>
+                  <span className="text-sm font-medium text-foreground">{c.title}</span>
                 </div>
-                <p className="text-xs text-zinc-400 leading-relaxed">{c.hint}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{c.hint}</p>
               </button>
             ))}
           </div>
@@ -163,36 +163,36 @@ export default function SQLiLab() {
 
         {/* Right Side: Interactive vulnerable form */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-6">
-            <h2 className="text-sm font-semibold mb-5 flex items-center gap-2 text-zinc-200">
-              <Code size={16} className="text-cyan-400" /> Simulated Portal Login
+          <div className="bg-surface border border-border rounded-xl p-6">
+            <h2 className="text-sm font-semibold mb-5 flex items-center gap-2 text-foreground">
+              <Code size={16} className="text-cyber-cyan" /> Simulated Portal Login
             </h2>
             
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2 block">Username</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Username</label>
                 <input 
                   value={username} 
                   onChange={e => setUsername(e.target.value)} 
                   placeholder="Enter username..." 
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-zinc-200 placeholder-zinc-700 font-mono focus:outline-none focus:border-cyan-400 transition-all" 
+                  className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground font-mono focus:outline-none focus:border-cyber-cyan transition-all" 
                 />
               </div>
               
               <div>
-                <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2 block">Password</label>
+                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Password</label>
                 <input 
                   value={password} 
                   onChange={e => setPassword(e.target.value)} 
                   placeholder="Enter password..." 
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2.5 text-sm text-zinc-200 placeholder-zinc-700 font-mono focus:outline-none focus:border-cyan-400 transition-all" 
+                  className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground font-mono focus:outline-none focus:border-cyber-cyan transition-all" 
                   disabled={activeChallenge === 1 && username.includes("'")} 
                 />
               </div>
               
               <button 
                 onClick={simulateLogin} 
-                className="bg-cyan-500 hover:bg-cyan-400 text-black font-semibold rounded-lg w-full py-2.5 text-sm flex items-center justify-center gap-2 transition-all hover:shadow-[0_0_15px_rgba(6,182,212,0.3)]"
+                className="btn-cyber btn-primary w-full text-sm"
               >
                 <Play size={14} fill="currentColor" /> Execute Database Query
               </button>
@@ -208,39 +208,39 @@ export default function SQLiLab() {
                   className="mt-6 space-y-4"
                 >
                   <div>
-                    <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2 block">Generated Backend SQL Statement</label>
-                    <pre className="text-xs font-mono p-4 rounded-lg bg-black border border-zinc-900 overflow-x-auto text-amber-400">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Generated Backend SQL Statement</label>
+                    <pre className="text-xs font-mono p-4 rounded-lg bg-background border border-border overflow-x-auto text-cyber-amber">
                       {result.query}
                     </pre>
                   </div>
 
                   <div className={`p-4 rounded-lg flex gap-3 border ${
                     result.success 
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25' 
-                      : 'bg-rose-500/10 text-rose-400 border-rose-500/25'
+                      ? 'bg-status-pass/10 text-status-pass border-status-pass/25' 
+                      : 'bg-status-fail/10 text-status-fail border-status-fail/25'
                   }`}>
                     {result.success ? <CheckCircle size={20} className="shrink-0 mt-0.5" /> : <AlertTriangle size={20} className="shrink-0 mt-0.5" />}
                     <div className="text-xs space-y-1">
                       <strong className="text-sm font-semibold">{result.success ? 'Success' : 'Failure'}</strong>
-                      <p className="text-zinc-300">{result.message}</p>
+                      <p className="text-foreground">{result.message}</p>
                     </div>
                   </div>
 
                   {/* Extracted database records display for union levels */}
                   {result.extractedData && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3 pt-3">
-                      <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                        <Database size={14} className="text-emerald-400" /> Extracted Database Records (Sensitive)
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                        <Database size={14} className="text-status-pass" /> Extracted Database Records (Sensitive)
                       </span>
-                      <div className="bg-zinc-950 border border-zinc-800 rounded-lg overflow-hidden font-mono text-xs">
-                        <div className="bg-zinc-900 px-4 py-2 flex justify-between border-b border-zinc-800 font-bold text-zinc-300">
+                      <div className="bg-surface border border-border rounded-lg overflow-hidden font-mono text-xs">
+                        <div className="bg-surface px-4 py-2 flex justify-between border-b border-border font-bold text-foreground">
                           <span>Extracted Column 1 (User)</span>
                           <span>Extracted Column 2 (Password Salt/Hash)</span>
                         </div>
                         {result.extractedData.map((data, index) => (
-                          <div key={index} className="px-4 py-2 flex justify-between border-b border-zinc-900/50 hover:bg-zinc-900/10 text-emerald-400">
+                          <div key={index} className="px-4 py-2 flex justify-between border-b border-border hover:bg-surface/10 text-status-pass">
                             <span>{data.col1}</span>
-                            <span className="text-zinc-500">{data.col2}</span>
+                            <span className="text-muted-foreground">{data.col2}</span>
                           </div>
                         ))}
                       </div>
@@ -252,14 +252,14 @@ export default function SQLiLab() {
           </div>
 
           {/* Secure fix comparison info */}
-          <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl p-6">
+          <div className="bg-surface border border-border rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold flex items-center gap-2 text-zinc-200">
-                <Shield size={16} className="text-emerald-400" /> Secure Fix Comparison
+              <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                <Shield size={16} className="text-status-pass" /> Secure Fix Comparison
               </h2>
               <button 
                 onClick={() => setShowSecure(!showSecure)} 
-                className="text-xs text-cyan-400 hover:text-cyan-300 font-semibold"
+                className="text-xs text-cyber-cyan hover:text-foreground font-semibold"
               >
                 {showSecure ? 'Hide Details' : 'Show Secure Code'}
               </button>
@@ -273,7 +273,7 @@ export default function SQLiLab() {
                   exit={{ opacity: 0, height: 0 }}
                   className="overflow-hidden space-y-4"
                 >
-                  <pre className="text-xs font-mono p-4 rounded-lg bg-black border border-emerald-500/20 overflow-x-auto text-emerald-400">
+                  <pre className="text-xs font-mono p-4 rounded-lg bg-background border border-status-pass/20 overflow-x-auto text-status-pass">
 {`// ❌ Vulnerable (direct string injection)
 const query = \`SELECT * FROM accounts WHERE user = '\${username}' AND pass = '\${password}';\`;
 
@@ -281,7 +281,7 @@ const query = \`SELECT * FROM accounts WHERE user = '\${username}' AND pass = '\
 const query = 'SELECT * FROM accounts WHERE user = ? AND pass = ?;';
 db.execute(query, [username, password]);`}
                   </pre>
-                  <div className="text-xs text-zinc-400 space-y-2 pl-2 border-l border-emerald-500/30">
+                  <div className="text-xs text-muted-foreground space-y-2 pl-2 border-l border-status-pass/30">
                     <p>• <strong>Parameterized Queries</strong> ensure that database engines evaluate variables purely as data parameters, never as SQL instructions, preventing quotes from closing statements.</p>
                     <p>• <strong>Strong input checks</strong> and ORMs (like Prisma or Sequelize) prevent raw queries entirely.</p>
                   </div>

@@ -11,10 +11,15 @@ import {
   validateImportedCyberKitData,
 } from '@/lib/store';
 
+const LAST_SYNCED_STORAGE_KEY = 'cyberkit:lastSyncedAt';
+
 export default function SettingsPage() {
   const [syncKey, setSyncKey] = useState('');
   const [syncStatus, setSyncStatus] = useState('');
-  const [syncing, setSyncing] = useState(false);
+  const [syncAction, setSyncAction] = useState<'push' | 'pull' | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : localStorage.getItem(LAST_SYNCED_STORAGE_KEY)
+  );
   const historyEntries = useHistoryStore((state) => state.entries);
   const loadHistory = useHistoryStore((state) => state.loadFromStorage);
   const clearHistory = useHistoryStore((state) => state.clearHistory);
@@ -30,6 +35,13 @@ export default function SettingsPage() {
     loadFavorites();
     loadReports();
   }, [loadFavorites, loadHistory, loadReports]);
+
+  const syncing = syncAction !== null;
+
+  const rememberLastSyncedAt = (value: string) => {
+    localStorage.setItem(LAST_SYNCED_STORAGE_KEY, value);
+    setLastSyncedAt(value);
+  };
 
   const exportData = () => {
     const data = buildExportData();
@@ -70,7 +82,7 @@ export default function SettingsPage() {
   };
 
   const pushCloudSync = async () => {
-    setSyncing(true);
+    setSyncAction('push');
     setSyncStatus('');
     try {
       const response = await fetch('/api/sync', {
@@ -80,16 +92,18 @@ export default function SettingsPage() {
       });
       const data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.message || data.error || 'Cloud sync failed');
-      setSyncStatus(`Synced at ${new Date(data.syncedAt).toLocaleString()}`);
+      const syncedAt = typeof data.syncedAt === 'string' ? data.syncedAt : new Date().toISOString();
+      rememberLastSyncedAt(syncedAt);
+      setSyncStatus(`Synced at ${new Date(syncedAt).toLocaleString()}`);
     } catch (error) {
       setSyncStatus(error instanceof Error ? error.message : 'Cloud sync failed');
     } finally {
-      setSyncing(false);
+      setSyncAction(null);
     }
   };
 
   const pullCloudSync = async () => {
-    setSyncing(true);
+    setSyncAction('pull');
     setSyncStatus('');
     try {
       const response = await fetch('/api/sync', {
@@ -101,11 +115,12 @@ export default function SettingsPage() {
       if (!response.ok || !data.success) throw new Error(data.message || data.error || 'Cloud restore failed');
       if (!data.found || !data.data) throw new Error('No cloud data found for this sync key');
       importCyberKitData(validateImportedCyberKitData(data.data));
+      rememberLastSyncedAt(new Date().toISOString());
       window.location.reload();
     } catch (error) {
       setSyncStatus(error instanceof Error ? error.message : 'Cloud restore failed');
     } finally {
-      setSyncing(false);
+      setSyncAction(null);
     }
   };
 
@@ -162,16 +177,29 @@ export default function SettingsPage() {
             disabled={syncing || syncKey.trim().length < 16}
             className="btn-cyber btn-secondary flex-1 disabled:opacity-50"
           >
-            <CloudUpload size={14} /> Push Backup
+            {syncAction === 'push' ? (
+              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <CloudUpload size={14} />
+            )}
+            {syncAction === 'push' ? 'Pushing...' : 'Push Backup'}
           </button>
           <button
             onClick={pullCloudSync}
             disabled={syncing || syncKey.trim().length < 16}
             className="btn-cyber btn-secondary flex-1 disabled:opacity-50"
           >
-            <CloudDownload size={14} /> Pull Restore
+            {syncAction === 'pull' ? (
+              <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <CloudDownload size={14} />
+            )}
+            {syncAction === 'pull' ? 'Pulling...' : 'Pull Restore'}
           </button>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Last synced at: {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : 'Never'}
+        </p>
         {syncStatus && <p className="text-xs text-muted-foreground">{syncStatus}</p>}
       </div>
 

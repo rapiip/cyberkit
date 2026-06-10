@@ -200,6 +200,9 @@ export function normalizeHostname(input: string) {
   }
 
   host = host.replace(/\.$/, '').toLowerCase();
+  if (host.startsWith('[') && host.endsWith(']')) host = host.slice(1, -1);
+  if (net.isIP(host)) return host;
+
   const ascii = domainToASCII(host);
   if (!ascii || ascii.length > 253) throw new PublicTargetError('Invalid hostname');
   if (ascii === 'localhost' || ascii.endsWith('.localhost')) {

@@ -10,7 +10,7 @@ const labs = [
     name: 'SQL Injection Lab',
     description: 'Study why unsafe query construction breaks authentication in a contained simulator, then compare it with parameterized query defenses.',
     difficulty: 'Intermediate',
-    color: '#ef4444',
+    accentClass: 'border-cyber-red/30 bg-cyber-red/10 text-cyber-red',
     topics: ['Authentication Bypass', 'UNION-based', 'Error-based', 'Parameterized Queries'],
   },
   {
@@ -18,7 +18,7 @@ const labs = [
     name: 'XSS Lab',
     description: 'Study how unsafe output rendering creates client-side risk in a sandbox, with emphasis on encoding, CSP, and cookie hardening.',
     difficulty: 'Intermediate',
-    color: '#f59e0b',
+    accentClass: 'border-cyber-amber/30 bg-cyber-amber/10 text-cyber-amber',
     topics: ['Reflected XSS', 'DOM-based XSS', 'Input Sanitization', 'Content Security Policy'],
   },
   {
@@ -26,7 +26,7 @@ const labs = [
     name: 'Authentication Bypass Lab',
     description: 'Review authentication logic flaws in a local-only simulation and learn how prepared statements keep credential checks intact.',
     difficulty: 'Intermediate',
-    color: '#06b6d4',
+    accentClass: 'border-cyber-cyan/30 bg-cyber-cyan/10 text-cyber-cyan',
     topics: ['Authentication Bypass', 'Login Flaws', 'Prepared Statements'],
   },
   {
@@ -34,7 +34,7 @@ const labs = [
     name: 'CSRF Concept Demo',
     description: 'Visualize how cookie-only state-changing requests can fail without CSRF tokens, SameSite cookies, and request verification.',
     difficulty: 'Intermediate',
-    color: '#f43f5e',
+    accentClass: 'border-cyber-pink/30 bg-cyber-pink/10 text-cyber-pink',
     topics: ['Cross-Site Request Forgery', 'SameSite Cookies', 'Anti-CSRF Tokens'],
   },
 ];
@@ -69,8 +69,8 @@ export default function LabsPage() {
           >
             <Link href={`/labs/${lab.id}`} className="glass-card p-6 flex flex-col h-full hover:border-cyber-cyan/30 transition-all group">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: `${lab.color}20`, border: `1px solid ${lab.color}40` }}>
-                  <Code size={20} style={{ color: lab.color }} />
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${lab.accentClass}`}>
+                  <Code size={20} />
                 </div>
                 <div>
                   <h2 className="font-semibold group-hover:text-cyber-cyan transition-colors">{lab.name}</h2>
