@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { FlaskConical, AlertTriangle, ArrowRight } from 'lucide-react';
+import { FlaskConical, AlertTriangle, Code, ArrowRight } from 'lucide-react';
 
 const labs = [
   {
@@ -10,7 +10,7 @@ const labs = [
     name: 'SQL Injection Lab',
     description: 'Study why unsafe query construction breaks authentication in a contained simulator, then compare it with parameterized query defenses.',
     difficulty: 'Intermediate',
-    accentClass: 'text-cyber-red',
+    accentClass: 'border-cyber-red/30 bg-cyber-red/10 text-cyber-red',
     topics: ['Authentication Bypass', 'UNION-based', 'Error-based', 'Parameterized Queries'],
   },
   {
@@ -18,7 +18,7 @@ const labs = [
     name: 'XSS Lab',
     description: 'Study how unsafe output rendering creates client-side risk in a sandbox, with emphasis on encoding, CSP, and cookie hardening.',
     difficulty: 'Intermediate',
-    accentClass: 'text-cyber-amber',
+    accentClass: 'border-cyber-amber/30 bg-cyber-amber/10 text-cyber-amber',
     topics: ['Reflected XSS', 'DOM-based XSS', 'Input Sanitization', 'Content Security Policy'],
   },
   {
@@ -26,7 +26,7 @@ const labs = [
     name: 'Authentication Bypass Lab',
     description: 'Review authentication logic flaws in a local-only simulation and learn how prepared statements keep credential checks intact.',
     difficulty: 'Intermediate',
-    accentClass: 'text-cyber-cyan',
+    accentClass: 'border-cyber-cyan/30 bg-cyber-cyan/10 text-cyber-cyan',
     topics: ['Authentication Bypass', 'Login Flaws', 'Prepared Statements'],
   },
   {
@@ -34,116 +34,62 @@ const labs = [
     name: 'CSRF Concept Demo',
     description: 'Visualize how cookie-only state-changing requests can fail without CSRF tokens, SameSite cookies, and request verification.',
     difficulty: 'Intermediate',
-    accentClass: 'text-cyber-pink',
+    accentClass: 'border-cyber-pink/30 bg-cyber-pink/10 text-cyber-pink',
     topics: ['Cross-Site Request Forgery', 'SameSite Cookies', 'Anti-CSRF Tokens'],
   },
 ];
 
-function getMonogram(name: string) {
-  return name
-    .split(' ')
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
-    .toUpperCase();
-}
 
 export default function LabsPage() {
-  const featuredLab = labs[0];
-  const remainingLabs = labs.slice(1);
-
   return (
-    <div className="page-shell-tight max-w-6xl space-y-8">
-      <motion.section
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]"
-      >
-        <div>
-          <div className="flex items-center gap-3">
-            <FlaskConical size={24} className="text-cyber-cyan" />
-            <h1 className="text-3xl font-bold">Security Labs</h1>
-          </div>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground">
-            Contained simulation environments for learning common security failures without leaving
-            the local workspace. This page now reads more like a mission board than another grid of
-            identical cards.
-          </p>
+    <div className="page-shell-tight max-w-5xl space-y-8">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <FlaskConical size={24} className="text-cyber-cyan" /> Security Labs
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Contained simulation environments for learning common security failures without leaving the local workspace.
+        </p>
+      </motion.div>
+
+      <div className="glass-card flex items-start gap-3 border-status-warn/20 p-4">
+        <AlertTriangle size={18} className="text-cyber-amber shrink-0 mt-0.5" />
+        <div className="text-sm text-muted-foreground">
+          <strong className="text-cyber-amber">Sandbox-only education.</strong> These labs run against local simulated targets only. Do not point these concepts at external systems; focus on the mitigation panels before applying changes in real applications.
         </div>
+      </div>
 
-        <div className="glass-card flex items-start gap-3 p-4">
-          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-cyber-amber" />
-          <div className="text-sm leading-6 text-muted-foreground">
-            <strong className="text-cyber-amber">Sandbox-only education.</strong> These labs run
-            against local simulated targets only. Focus on the mitigation panels before applying any
-            concept in real applications.
-          </div>
-        </div>
-      </motion.section>
-
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-        <Link
-          href={`/labs/${featuredLab.id}`}
-          className="glass-card group block p-6 transition-colors hover:border-border-bright"
-        >
-          <div className="grid gap-6 md:grid-cols-[96px_minmax(0,1fr)]">
-            <div className={`font-mono text-5xl font-semibold ${featuredLab.accentClass}`}>
-              {getMonogram(featuredLab.name)}
-            </div>
-            <div>
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="badge badge-amber text-[10px]">{featuredLab.difficulty}</span>
-                <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  Featured simulation
-                </span>
-              </div>
-              <h2 className="text-2xl font-semibold tracking-tight">{featuredLab.name}</h2>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
-                {featuredLab.description}
-              </p>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {featuredLab.topics.map((topic) => (
-                  <span
-                    key={topic}
-                    className="rounded-full border border-border px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground"
-                  >
-                    {topic}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-5 inline-flex items-center gap-1 text-sm text-cyber-cyan">
-                Start lab <ArrowRight size={14} />
-              </div>
-            </div>
-          </div>
-        </Link>
-
-        <div className="glass-card p-4">
-          <div className="mb-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-            Remaining simulations
-          </div>
-          <div className="space-y-2">
-            {remainingLabs.map((lab) => (
-              <Link
-                key={lab.id}
-                href={`/labs/${lab.id}`}
-                className="block rounded-2xl border border-border/70 bg-[color:var(--panel-subtle)] px-4 py-4 transition-colors hover:border-border-bright hover:bg-surface-hover"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`font-mono text-sm ${lab.accentClass}`}>{getMonogram(lab.name)}</span>
-                      <h3 className="text-sm font-medium">{lab.name}</h3>
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-muted-foreground">{lab.description}</p>
-                  </div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {labs.map((lab, i) => (
+          <motion.div
+            key={lab.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+          >
+            <Link href={`/labs/${lab.id}`} className="glass-card interactive-card group flex h-full flex-col p-6 transition-all hover:border-[color:var(--accent-border)]">
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${lab.accentClass}`}>
+                  <Code size={20} />
+                </div>
+                <div>
+                  <h2 className="font-semibold transition-colors group-hover:text-foreground">{lab.name}</h2>
                   <span className="badge badge-amber text-[10px]">{lab.difficulty}</span>
                 </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+              </div>
+              <p className="text-sm text-muted-foreground flex-1">{lab.description}</p>
+              <div className="flex flex-wrap gap-1.5 mt-4">
+                {lab.topics.map((topic) => (
+                  <span key={topic} className="badge border border-border bg-[color:var(--panel-subtle)] text-[10px] text-muted-foreground">{topic}</span>
+                ))}
+              </div>
+              <div className="flex items-center gap-1 mt-4 text-xs text-cyber-cyan">
+                Start Lab <ArrowRight size={12} />
+              </div>
+            </Link>
+          </motion.div>
+        ))}
+      </div>
     </div>
   );
 }
