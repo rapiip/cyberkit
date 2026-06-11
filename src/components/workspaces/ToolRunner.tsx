@@ -259,14 +259,14 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
                 handleFileSelection(input, event.dataTransfer.files);
               }}
               aria-describedby={errorMessage ? `${inputId}-error` : undefined}
-              className={`w-full rounded-xl border border-dashed px-4 py-4 text-left transition-colors ${
+              className={`w-full rounded-2xl border border-dashed px-4 py-4 text-left transition-colors ${
                 dragOverInputId === input.id
-                  ? 'border-cyber-cyan bg-cyber-cyan/10'
-                  : 'border-border bg-surface hover:border-cyber-cyan/35'
+                  ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)]'
+                  : 'border-border bg-[color:var(--panel-subtle)] hover:border-[color:var(--accent-border)] hover:bg-surface'
               }`}
             >
               <div className="flex items-start gap-3">
-                <div className="mt-0.5 rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/10 p-2 text-cyber-cyan">
+                <div className="mt-0.5 rounded-xl border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] p-2 text-cyber-cyan">
                   <FileUp size={16} />
                 </div>
                 <div className="min-w-0">
@@ -286,7 +286,7 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
               </div>
             </button>
             {selectedFiles.length > 0 && (
-              <div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">
+              <div className="rounded-xl border border-border bg-[color:var(--panel-subtle)] px-3 py-2 text-xs text-muted-foreground">
                 <div className="flex items-center justify-between gap-3">
                   <span className="truncate">
                     {selectedFiles.slice(0, 2).map((file) => file.name).join(', ')}
@@ -330,7 +330,7 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
         </h3>
         <div className="mt-4 space-y-4">
           {tool.persistHistory === false && (
-            <div className="rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/5 px-3 py-2 text-xs text-muted-foreground">
+            <div className="rounded-xl border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] px-3 py-2 text-xs text-muted-foreground">
               Privacy mode: inputs and results from this panel are not written to history,
               reports, analytics, or localStorage.
             </div>
@@ -358,7 +358,7 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
             </div>
           ))}
           {submitAttempted && Object.keys(validationErrors).length > 0 && (
-            <div className="rounded-lg border border-status-warn/20 bg-status-warn/10 px-3 py-2 text-xs text-status-warn">
+            <div className="rounded-xl border border-status-warn/20 bg-status-warn/10 px-3 py-2 text-xs text-status-warn">
               Complete the required fields before running this panel.
             </div>
           )}
@@ -389,7 +389,7 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
             </button>
           )}
           {running && progress && (
-            <div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">
+            <div className="rounded-xl border border-border bg-[color:var(--panel-subtle)] px-3 py-2 text-xs text-muted-foreground">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <span>{progress.label}</span>
                 <span>{progress.current}/{progress.total}</span>
@@ -480,7 +480,7 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
                   {result.items?.map((item, index) => (
                     <div
                       key={`${index}-${item.label}-${item.value}`}
-                      className="flex items-center justify-between gap-3 rounded-lg bg-surface px-3 py-2 text-sm"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] px-3 py-2.5 text-sm"
                     >
                       <span className="text-muted-foreground">{item.label}</span>
                       <span className="max-w-[300px] truncate text-right font-mono text-xs">
@@ -489,19 +489,19 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
                     </div>
                   ))}
                   {!result.items?.length && (
-                    <pre className="overflow-auto whitespace-pre-wrap rounded-lg bg-surface p-3 font-mono text-xs text-muted-foreground">
+                    <pre className="overflow-auto whitespace-pre-wrap rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] p-3 font-mono text-xs text-muted-foreground">
                       {JSON.stringify(result.data, null, 2)}
                     </pre>
                   )}
                 </div>
               )}
               {activeResultTab === 'raw' && (
-                <pre className="max-h-[400px] overflow-auto whitespace-pre-wrap rounded-lg bg-surface p-4 font-mono text-xs">
+                <pre className="max-h-[400px] overflow-auto whitespace-pre-wrap rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] p-4 font-mono text-xs">
                   {result.rawOutput || 'No raw output'}
                 </pre>
               )}
               {activeResultTab === 'explanation' && result.explanation && (
-                <div className="whitespace-pre-wrap rounded-lg bg-surface p-4 text-sm text-muted-foreground">
+                <div className="whitespace-pre-wrap rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] p-4 text-sm text-muted-foreground">
                   <Info size={14} className="mr-2 inline text-cyber-cyan" />
                   {result.explanation}
                 </div>

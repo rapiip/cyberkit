@@ -102,7 +102,7 @@ export default function SQLiLab() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
+    <div className="page-shell-tight max-w-6xl space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Link href="/labs" className="hover:text-foreground">Labs</Link>
@@ -112,7 +112,7 @@ export default function SQLiLab() {
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-bold flex items-center gap-3">
-          <FlaskConical className="text-cyber-red drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]" /> 
+          <FlaskConical className="text-cyber-red" /> 
           SQL Injection Lab
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -120,7 +120,7 @@ export default function SQLiLab() {
         </p>
       </motion.div>
 
-      <div className="bg-surface p-4 flex items-start gap-3 rounded-lg border border-cyber-amber/20 text-xs">
+      <div className="rounded-xl border border-status-warn/20 bg-[color:var(--panel-subtle)] p-4 flex items-start gap-3 text-xs">
         <AlertTriangle size={16} className="text-cyber-amber shrink-0 mt-0.5" />
         <span className="text-muted-foreground">
           <strong className="text-cyber-amber">Educational Sandbox.</strong> No real databases are impacted. Verify your SQL injection skills below.
@@ -143,13 +143,13 @@ export default function SQLiLab() {
                 }}
                 className={`w-full text-left bg-surface border rounded-xl p-4 transition-all ${
                   activeChallenge === i 
-                    ? 'border-cyber-cyan/40 bg-cyber-cyan/5 shadow-[0_0_15px_rgba(34,211,238,0.15)]' 
+                    ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)]' 
                     : 'border-border hover:border-border-bright'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                    activeChallenge === i ? 'bg-cyber-cyan/10 text-cyber-cyan border border-cyber-cyan/20' : 'bg-muted text-muted-foreground'
+                    activeChallenge === i ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-cyber-cyan' : 'bg-muted text-muted-foreground'
                   }`}>
                     Level {c.level}
                   </span>
@@ -175,7 +175,7 @@ export default function SQLiLab() {
                   value={username} 
                   onChange={e => setUsername(e.target.value)} 
                   placeholder="Enter username..." 
-                  className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground font-mono focus:outline-none focus:border-cyber-cyan transition-all" 
+                  className="input-cyber px-4 py-2.5 text-sm font-mono" 
                 />
               </div>
               
@@ -185,7 +185,7 @@ export default function SQLiLab() {
                   value={password} 
                   onChange={e => setPassword(e.target.value)} 
                   placeholder="Enter password..." 
-                  className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground font-mono focus:outline-none focus:border-cyber-cyan transition-all" 
+                  className="input-cyber px-4 py-2.5 text-sm font-mono" 
                   disabled={activeChallenge === 1 && username.includes("'")} 
                 />
               </div>

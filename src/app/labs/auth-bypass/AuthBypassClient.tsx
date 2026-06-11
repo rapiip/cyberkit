@@ -31,7 +31,7 @@ export default function AuthBypassLab() {
   const isBypassed = username.trim().toLowerCase().includes("'--") || username.trim().toLowerCase().includes("' --") || username.trim().toLowerCase().includes("' or '1'='1");
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
+    <div className="page-shell-tight max-w-5xl space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/labs" className="btn-cyber btn-ghost btn-sm p-1.5 rounded-lg" title="Back to labs" aria-label="Back to labs">
@@ -52,7 +52,7 @@ export default function AuthBypassLab() {
         <button
           onClick={() => setActiveTab('interactive')}
           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-            activeTab === 'interactive' ? 'border-cyber-cyan text-cyber-cyan' : 'border-transparent text-muted-foreground hover:text-foreground'
+            activeTab === 'interactive' ? 'border-[color:var(--accent-border)] text-cyber-cyan' : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
           Interactive Simulation
@@ -91,7 +91,7 @@ export default function AuthBypassLab() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g., training username"
-                  className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyber-cyan transition-all font-mono"
+                  className="input-cyber px-4 py-2.5 text-sm font-mono"
                 />
               </div>
 
@@ -102,7 +102,7 @@ export default function AuthBypassLab() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter password..."
-                  className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyber-cyan transition-all font-mono"
+                  className="input-cyber px-4 py-2.5 text-sm font-mono"
                   disabled={username.includes("'--")}
                 />
               </div>
@@ -143,7 +143,7 @@ export default function AuthBypassLab() {
               </div>
 
               {isBypassed && (
-                <div className="p-3 bg-cyber-cyan/10 border border-cyber-cyan/20 text-cyber-cyan text-xs rounded-lg flex gap-2">
+                <div className="flex gap-2 rounded-xl border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] p-3 text-xs text-cyber-cyan">
                   <AlertCircle size={16} className="shrink-0 mt-0.5" />
                   <div>
                     <strong>Injection Triggered:</strong> The single quote closed the string parameter early, and the double dash (<code className="font-bold">--</code>) commented out the remaining password matching logic!

@@ -49,10 +49,10 @@ export default function WorkspacesPage() {
               <Link
                 key={workspace.id}
                 href={workspace.canonicalPath}
-                className="glass-card interactive-card group flex min-h-52 flex-col p-5 transition-all hover:border-cyber-cyan/35"
+                className="glass-card interactive-card group flex min-h-52 flex-col p-5 transition-all hover:border-[color:var(--accent-border)]"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/10 text-cyber-cyan">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-cyber-cyan">
                     <WorkspaceIcon name={workspace.icon} />
                   </div>
                   <div className="flex gap-2">
@@ -60,7 +60,7 @@ export default function WorkspacesPage() {
                     <span className="badge badge-cyan capitalize">{workspace.maturity}</span>
                   </div>
                 </div>
-                <h3 className="mt-5 font-semibold transition-colors group-hover:text-cyber-cyan">
+                <h3 className="mt-5 font-semibold transition-colors group-hover:text-foreground">
                   {workspace.name}
                 </h3>
                 <p className="mt-2 flex-1 text-sm leading-6 text-muted-foreground">
@@ -85,14 +85,14 @@ export default function WorkspacesPage() {
         </div>
         <Link
           href="/labs"
-          className="glass-card interactive-card group flex max-w-2xl items-start gap-4 p-5 transition-all hover:border-cyber-purple/35"
+          className="glass-card interactive-card group flex max-w-2xl items-start gap-4 p-5 transition-all hover:border-border-bright"
         >
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-cyber-purple/20 bg-cyber-purple/10 text-cyber-purple">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-[color:var(--panel-subtle)] text-cyber-purple">
             <FlaskConical size={22} />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-semibold group-hover:text-cyber-purple">Security Labs</h3>
+              <h3 className="font-semibold group-hover:text-foreground">Security Labs</h3>
               <span className="badge badge-purple">Experimental</span>
             </div>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">

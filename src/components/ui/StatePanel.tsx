@@ -22,10 +22,10 @@ export default function StatePanel({
       }`}
     >
       <div
-        className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg border ${
+        className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border ${
           tone === 'error'
             ? 'border-status-fail/20 bg-status-fail/10 text-status-fail'
-            : 'border-border bg-surface text-muted-foreground'
+            : 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-cyber-cyan'
         }`}
       >
         {icon}

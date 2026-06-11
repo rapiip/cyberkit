@@ -300,8 +300,8 @@ ${(resData.findings || [])
   return (
     <div className="page-shell-tight max-w-5xl space-y-6">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <Shield size={32} className="text-cyber-cyan text-glow-cyan" /> 
+        <h1 className="text-3xl font-bold flex items-center gap-3 tracking-tight">
+          <Shield size={32} className="text-cyber-cyan" /> 
           Website Security Audit
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -321,7 +321,7 @@ ${(resData.findings || [])
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="e.g. google.com or https://github.com"
-            className="input-cyber pl-12 pr-4 py-3 text-sm"
+              className="input-cyber pl-12 pr-4 py-3 text-sm"
               onKeyDown={(e) => e.key === 'Enter' && runAudit()}
               disabled={running}
             />
@@ -398,7 +398,7 @@ ${(resData.findings || [])
               </div>
             </div>
 
-            <div className="flex items-center gap-6 self-start rounded-2xl border border-border bg-surface/70 px-5 py-4">
+            <div className="flex items-center gap-6 self-start rounded-2xl border border-border bg-black/10 px-5 py-4">
               <div className="relative flex items-center justify-center">
                 <svg className="h-24 w-24 -rotate-90 transform">
                   <circle cx="48" cy="48" r="40" className="stroke-muted fill-none" strokeWidth="6" />
@@ -462,7 +462,7 @@ ${(resData.findings || [])
           {topFindings.length > 0 && (
             <div className="grid gap-3 lg:grid-cols-3">
               {topFindings.map((finding) => (
-                <div key={finding.id} className="rounded-xl border border-border bg-surface/70 p-4">
+                <div key={finding.id} className="rounded-xl border border-border bg-black/10 p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold text-foreground">{finding.title}</span>
                     <span className="badge badge-red">{finding.severity}</span>

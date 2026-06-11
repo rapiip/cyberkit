@@ -18,7 +18,9 @@ export default function HistoryPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><History size={24} className="text-muted-foreground" /> Scan History</h1>
-          <p className="text-sm text-muted-foreground mt-1">{entries.length} entries saved locally</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Review local execution traces, reopen tool panels, and clear stale results when needed.
+          </p>
         </div>
         {entries.length > 0 && (
           <button onClick={clearHistory} className="btn-cyber btn-danger btn-sm"><Trash2 size={12} /> Clear All</button>
@@ -30,7 +32,7 @@ export default function HistoryPage() {
           icon={<Clock size={24} />}
           title="No scan history"
           description="Run a tool to save local execution history here."
-          action={<Link href="/tools" className="text-cyber-cyan text-sm hover:underline">Browse Tools</Link>}
+          action={<Link href="/tools" className="text-sm text-cyber-cyan hover:text-foreground">Browse Tools</Link>}
         />
       ) : (
         <div className="space-y-2">
@@ -51,8 +53,8 @@ export default function HistoryPage() {
                       <span className="font-medium text-sm">{entry.toolName}</span>
                       <span className="badge badge-cyan text-xs">{tool?.category || 'unknown'}</span>
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground truncate">{entry.input}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{entry.resultSummary}</p>
+                    <p className="mt-2 truncate text-sm text-muted-foreground">{entry.input}</p>
+                    <p className="mt-1 rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] px-3 py-2 text-sm text-muted-foreground">{entry.resultSummary}</p>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</span>
                       {tool && (

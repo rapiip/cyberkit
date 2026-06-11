@@ -115,7 +115,7 @@ export default function XSSLab() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
+    <div className="page-shell-tight max-w-6xl space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <Link href="/labs" className="hover:text-foreground">Labs</Link>
@@ -125,7 +125,7 @@ export default function XSSLab() {
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-bold flex items-center gap-3">
-          <FlaskConical className="text-cyber-amber drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]" /> 
+          <FlaskConical className="text-cyber-amber" /> 
           Cross-Site Scripting (XSS) Lab
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -133,7 +133,7 @@ export default function XSSLab() {
         </p>
       </motion.div>
 
-      <div className="bg-surface p-4 flex items-start gap-3 rounded-lg border border-cyber-amber/20 text-xs">
+      <div className="rounded-xl border border-status-warn/20 bg-[color:var(--panel-subtle)] p-4 flex items-start gap-3 text-xs">
         <AlertTriangle size={16} className="text-cyber-amber shrink-0 mt-0.5" />
         <span className="text-muted-foreground">
           <strong className="text-cyber-amber">Safe Sandbox.</strong> No scripts are actually executed against your machine. Celah XSS dianalisis secara sandboxed.
@@ -155,13 +155,13 @@ export default function XSSLab() {
                 }}
                 className={`w-full text-left bg-surface border rounded-xl p-4 transition-all ${
                   activeChallenge === i 
-                    ? 'border-cyber-amber/40 bg-cyber-amber/5 shadow-[0_0_15px_rgba(245,158,11,0.15)]' 
+                    ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)]' 
                     : 'border-border hover:border-border-bright'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                    activeChallenge === i ? 'bg-cyber-amber/10 text-cyber-amber border border-cyber-amber/20' : 'bg-muted text-muted-foreground'
+                    activeChallenge === i ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-cyber-amber' : 'bg-muted text-muted-foreground'
                   }`}>
                     Level {c.level}
                   </span>
@@ -188,13 +188,13 @@ export default function XSSLab() {
                   onChange={e => setInput(e.target.value)} 
                   placeholder="Paste sandbox training markup..." 
                   rows={3}
-                  className="w-full bg-surface border border-border rounded-lg p-3 text-xs text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:border-cyber-amber transition-all" 
+                  className="input-cyber p-3 text-xs font-mono" 
                 />
               </div>
               
               <button 
                 onClick={handleSubmit} 
-                className="btn-cyber btn-secondary w-full text-sm text-cyber-amber border-cyber-amber/30"
+                className="btn-cyber btn-secondary w-full text-sm text-cyber-amber"
               >
                 <Play size={14} fill="currentColor" /> Submit Input Form
               </button>
@@ -317,7 +317,7 @@ function escapeHtml(str) {
               <div className="flex justify-end pt-2">
                 <button
                   onClick={() => setShowMockAlert(false)}
-                  className="btn-cyber btn-secondary btn-sm text-cyber-amber border-cyber-amber/30 font-mono"
+                  className="btn-cyber btn-secondary btn-sm text-cyber-amber font-mono"
                 >
                   OK
                 </button>

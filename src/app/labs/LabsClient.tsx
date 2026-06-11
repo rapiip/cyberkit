@@ -42,24 +42,24 @@ const labs = [
 
 export default function LabsPage() {
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-8">
+    <div className="page-shell-tight max-w-5xl space-y-8">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <FlaskConical size={24} className="text-cyber-cyan" /> Security Labs
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Interactive learning environments to practice cybersecurity concepts safely.
+          Contained simulation environments for learning common security failures without leaving the local workspace.
         </p>
       </motion.div>
 
-      <div className="glass-card p-4 flex items-start gap-3 border-cyber-amber/30">
+      <div className="glass-card flex items-start gap-3 border-status-warn/20 p-4">
         <AlertTriangle size={18} className="text-cyber-amber shrink-0 mt-0.5" />
         <div className="text-sm text-muted-foreground">
           <strong className="text-cyber-amber">Sandbox-only education.</strong> These labs run against local simulated targets only. Do not point these concepts at external systems; focus on the mitigation panels before applying changes in real applications.
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {labs.map((lab, i) => (
           <motion.div
             key={lab.id}
@@ -67,20 +67,20 @@ export default function LabsPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
           >
-            <Link href={`/labs/${lab.id}`} className="glass-card p-6 flex flex-col h-full hover:border-cyber-cyan/30 transition-all group">
+            <Link href={`/labs/${lab.id}`} className="glass-card interactive-card group flex h-full flex-col p-6 transition-all hover:border-[color:var(--accent-border)]">
               <div className="flex items-center gap-3 mb-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center border ${lab.accentClass}`}>
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${lab.accentClass}`}>
                   <Code size={20} />
                 </div>
                 <div>
-                  <h2 className="font-semibold group-hover:text-cyber-cyan transition-colors">{lab.name}</h2>
+                  <h2 className="font-semibold transition-colors group-hover:text-foreground">{lab.name}</h2>
                   <span className="badge badge-amber text-[10px]">{lab.difficulty}</span>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground flex-1">{lab.description}</p>
               <div className="flex flex-wrap gap-1.5 mt-4">
                 {lab.topics.map((topic) => (
-                  <span key={topic} className="badge bg-muted text-muted-foreground border border-border text-[10px]">{topic}</span>
+                  <span key={topic} className="badge border border-border bg-[color:var(--panel-subtle)] text-[10px] text-muted-foreground">{topic}</span>
                 ))}
               </div>
               <div className="flex items-center gap-1 mt-4 text-xs text-cyber-cyan">

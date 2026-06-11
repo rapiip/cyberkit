@@ -82,7 +82,7 @@ export default function CommandPalette() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-start justify-center bg-black/75 px-3 pt-[12vh] backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-[#050709]/80 px-3 pt-[12vh] backdrop-blur-md"
           onClick={closePalette}
         >
           <motion.div
@@ -93,10 +93,10 @@ export default function CommandPalette() {
             initial={{ opacity: 0, scale: 0.96, y: -12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -12 }}
-            className="glass-card w-full max-w-xl overflow-hidden border border-cyber-cyan/30"
+            className="glass-card w-full max-w-xl overflow-hidden border border-[color:var(--accent-border)] shadow-[0_30px_80px_rgba(0,0,0,0.45)]"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center gap-3 border-b border-border px-4 py-3.5">
+            <div className="flex items-center gap-3 border-b border-border px-4 py-4">
               <span id="command-palette-title" className="sr-only">Search CyberKit workspaces</span>
               <Search size={18} className="shrink-0 text-cyber-cyan" />
               <input
@@ -129,8 +129,10 @@ export default function CommandPalette() {
                       type="button"
                       role="option"
                       aria-selected={active}
-                      className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left ${
-                        active ? 'bg-cyber-cyan/10 text-cyber-cyan' : 'hover:bg-surface-hover'
+                      className={`relative flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
+                        active
+                          ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-foreground'
+                          : 'border-transparent hover:border-[color:var(--accent-border)] hover:bg-surface-hover'
                       }`}
                       onMouseEnter={() => setSelectedIndex(index)}
                       onClick={() => navigate(result.href)}
@@ -170,7 +172,7 @@ export function CommandPaletteTrigger() {
     <button
       type="button"
       onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
-      className="hidden items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground transition-all hover:border-cyber-cyan/30 sm:flex"
+      className="hidden items-center gap-2 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground transition-all hover:border-[color:var(--accent-border)] hover:bg-surface-hover sm:flex"
       aria-label="Open command palette"
     >
       <Search size={14} />

@@ -157,29 +157,29 @@ export default function SettingsPage() {
     <div className="page-shell-tight max-w-3xl space-y-6">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Settings size={24} className="text-muted-foreground" /> Settings</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage your data and preferences.</p>
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          Manage local data, encrypted sync behavior, and destructive actions from one quieter control surface.
+        </p>
       </motion.div>
 
-      {/* Data Summary */}
       <div className="glass-card p-5 space-y-4">
         <h2 className="font-semibold text-sm flex items-center gap-2"><Info size={14} /> Data Summary</h2>
         <div className="grid grid-cols-3 gap-4 text-center">
-          <div className="p-3 rounded-lg bg-surface">
+          <div className="rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] p-3">
             <div className="text-lg font-bold">{historyEntries.length}</div>
             <div className="text-xs text-muted-foreground">History Entries</div>
           </div>
-          <div className="p-3 rounded-lg bg-surface">
+          <div className="rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] p-3">
             <div className="text-lg font-bold">{favoriteTools.length}</div>
             <div className="text-xs text-muted-foreground">Favorite Tools</div>
           </div>
-          <div className="p-3 rounded-lg bg-surface">
+          <div className="rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] p-3">
             <div className="text-lg font-bold">{savedReports.length}</div>
             <div className="text-xs text-muted-foreground">Saved Reports</div>
           </div>
         </div>
       </div>
 
-      {/* Export/Import */}
       <div className="glass-card p-5 space-y-4">
         <h2 className="font-semibold text-sm">Data Management</h2>
         <div className="flex flex-wrap gap-3">
@@ -216,7 +216,7 @@ export default function SettingsPage() {
           maxLength={256}
           autoComplete="new-password"
         />
-        <div className="rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/5 p-3 text-xs leading-5 text-muted-foreground">
+        <div className="rounded-xl border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] p-3 text-xs leading-5 text-muted-foreground">
           Your browser encrypts exports with AES-256-GCM. The key is derived locally with
           PBKDF2-SHA-256 and a random salt. The server receives only the Sync ID plus
           ciphertext, IV, salt, format version, and timestamp. The passphrase and plaintext
@@ -252,11 +252,10 @@ export default function SettingsPage() {
         <p className="text-xs text-muted-foreground">
           Last synced at: {lastSyncedAt ? new Date(lastSyncedAt).toLocaleString() : 'Never'}
         </p>
-        {syncStatus && <p className="text-xs text-muted-foreground">{syncStatus}</p>}
+        {syncStatus && <p className="rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] px-3 py-2 text-xs text-muted-foreground">{syncStatus}</p>}
       </div>
 
-      {/* Clear Data */}
-      <div className="glass-card p-5 space-y-4 border-cyber-red/20">
+      <div className="glass-card space-y-4 border-status-fail/20 p-5">
         <h2 className="font-semibold text-sm text-cyber-red">Danger Zone</h2>
         <div className="space-y-3">
           <button onClick={() => {

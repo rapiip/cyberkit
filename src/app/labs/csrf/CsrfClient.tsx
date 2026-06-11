@@ -39,7 +39,7 @@ export default function CSRFLab() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
+    <div className="page-shell-tight max-w-5xl space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/labs" className="btn-cyber btn-ghost btn-sm p-1.5 rounded-lg" title="Back to labs" aria-label="Back to labs">
@@ -60,7 +60,7 @@ export default function CSRFLab() {
         <button
           onClick={() => setActiveTab('interactive')}
           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-            activeTab === 'interactive' ? 'border-cyber-cyan text-cyber-cyan' : 'border-transparent text-muted-foreground hover:text-foreground'
+            activeTab === 'interactive' ? 'border-[color:var(--accent-border)] text-cyber-cyan' : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
           Interactive Simulation
@@ -89,7 +89,7 @@ export default function CSRFLab() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             {/* Left Screen: Vulnerable Bank App */}
-            <div className="lg:col-span-6 bg-surface border border-border rounded-xl overflow-hidden shadow-xl flex flex-col justify-between min-h-[420px]">
+            <div className="lg:col-span-6 bg-surface border border-border rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.28)] flex flex-col justify-between min-h-[420px]">
               <div className="bg-surface px-5 py-3 border-b border-border flex items-center justify-between">
                 <span className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <span className="w-2 h-2 bg-status-pass rounded-full animate-pulse" />
@@ -154,7 +154,7 @@ export default function CSRFLab() {
             </div>
 
             {/* Right Screen: External training page */}
-            <div className="lg:col-span-6 bg-surface border border-border rounded-xl overflow-hidden shadow-xl flex flex-col justify-between min-h-[420px]">
+            <div className="lg:col-span-6 bg-surface border border-border rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.28)] flex flex-col justify-between min-h-[420px]">
               <div className="bg-status-fail/10 px-5 py-3 border-b border-border flex items-center justify-between">
                 <span className="text-xs font-semibold text-status-fail uppercase tracking-wider flex items-center gap-1.5">
                   <Shield size={12} /> External Training Page

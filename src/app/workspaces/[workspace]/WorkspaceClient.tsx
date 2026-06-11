@@ -73,10 +73,10 @@ export default function WorkspaceClient({
   return (
     <div className="page-shell space-y-6">
       <header className="glass-card relative overflow-hidden p-6 md:p-8">
-        <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-cyber-cyan/10 to-transparent" />
+        <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-[color:var(--accent-soft)] to-transparent" />
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex min-w-0 items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-cyber-cyan/20 bg-cyber-cyan/10 text-cyber-cyan">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-cyber-cyan">
               <Icon size={24} />
             </div>
             <div>
@@ -121,7 +121,7 @@ export default function WorkspaceClient({
         workspace.id === 'secret-scanner' ||
         workspace.id === 'file-triage-ioc'
       ) && (
-        <aside className="rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/5 p-4 text-sm text-muted-foreground">
+        <aside className="rounded-2xl border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] p-4 text-sm text-muted-foreground">
           {workspace.id === 'password-security'
             ? 'Password inputs and generated values remain in browser memory and are excluded from history, reports, analytics, localStorage, exports, and Cloud Sync. Optional HIBP checks send only a five-character SHA-1 prefix, receive a parsed range, and keep suffix matching local.'
             : workspace.id === 'jwt-inspector'
@@ -137,7 +137,7 @@ export default function WorkspaceClient({
           icon={<Workflow size={24} />}
           title="No capability panels available"
           description="This workspace is registered, but no executable capability is currently assigned."
-          action={<Link href="/workspaces" className="text-sm text-cyber-cyan">Back to workspaces</Link>}
+          action={<Link href="/workspaces" className="text-sm text-cyber-cyan hover:text-foreground">Back to workspaces</Link>}
         />
       ) : (
         <>
@@ -166,7 +166,7 @@ export default function WorkspaceClient({
                       onClick={() => selectTool(tool.id)}
                       className={`tab-item border ${
                         activeToolId === tool.id
-                          ? 'active border-cyber-cyan/30'
+                          ? 'active border-[color:var(--accent-border)]'
                           : 'border-transparent bg-surface'
                       }`}
                     >
@@ -196,7 +196,7 @@ export default function WorkspaceClient({
                         onClick={() => selectTool(tool.id)}
                         className={`tab-item border ${
                           activeToolId === tool.id
-                            ? 'active border-cyber-cyan/30'
+                            ? 'active border-[color:var(--accent-border)]'
                             : 'border-transparent bg-surface'
                         }`}
                       >

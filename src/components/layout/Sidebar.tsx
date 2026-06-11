@@ -99,14 +99,14 @@ export default function Sidebar() {
           onClick={() => setMobileOpen(false)}
           aria-current={active ? 'page' : undefined}
           title={isCollapsed ? item.label : undefined}
-          className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+          className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
             active ? 'text-cyber-cyan' : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
           }`}
         >
           {active && (
             <motion.span
               layoutId={isCollapsed ? 'desktopNavIndicator' : undefined}
-              className="absolute inset-0 rounded-lg border-l-[3px] border-cyber-cyan bg-cyber-cyan/10"
+              className="absolute inset-0 rounded-xl border border-cyber-cyan/18 bg-cyber-cyan/10"
             />
           )}
           <Icon size={18} className="relative z-10 shrink-0" aria-hidden="true" />
@@ -118,13 +118,13 @@ export default function Sidebar() {
   const sidebarContent = (isCollapsed: boolean) => (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyber-cyan to-cyber-green text-sm font-bold text-[#06080f]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyber-cyan/16 bg-cyber-cyan/10 text-sm font-bold text-cyber-cyan">
           CK
         </div>
         {!isCollapsed && (
           <div className="min-w-0">
-            <span className="block text-sm font-bold gradient-text">CyberKit</span>
-            <span className="block text-xs text-muted-foreground">Task-first security workspace</span>
+            <span className="block text-sm font-semibold tracking-tight text-foreground">CyberKit</span>
+            <span className="block text-xs text-muted-foreground">Stealth Console workspace</span>
           </div>
         )}
       </div>
@@ -154,7 +154,7 @@ export default function Sidebar() {
       <button
         ref={openButtonRef}
         type="button"
-        className="fixed left-3 top-3 z-50 rounded-lg border border-border bg-surface/95 p-2 transition-all hover:border-cyber-cyan/35 md:hidden"
+        className="fixed left-3 top-3 z-50 rounded-xl border border-border bg-surface/95 p-2.5 transition-all hover:border-cyber-cyan/25 md:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="Open navigation menu"
         aria-expanded={mobileOpen}
@@ -168,7 +168,7 @@ export default function Sidebar() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm md:hidden"
+            className="fixed inset-0 z-40 bg-black/72 backdrop-blur-sm md:hidden"
             onClick={() => setMobileOpen(false)}
           >
             <motion.aside
@@ -179,7 +179,7 @@ export default function Sidebar() {
               role="dialog"
               aria-modal="true"
               aria-label="Mobile navigation"
-              className="h-full w-72 border-r border-border bg-surface"
+              className="h-full w-72 border-r border-border bg-[#171c21]"
               onClick={(event) => event.stopPropagation()}
             >
               <button

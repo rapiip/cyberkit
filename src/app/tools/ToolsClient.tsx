@@ -44,7 +44,10 @@ function ToolsPageInner() {
     <div className="page-shell space-y-6">
       <div>
         <h1 className="text-2xl font-bold">All Tools</h1>
-        <p className="text-sm text-muted-foreground mt-1">{allToolMetadata.length} cybersecurity tools available</p>
+        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          Browse every capability as a flat catalog, then jump into focused workspaces when you
+          want a tighter operational flow.
+        </p>
       </div>
 
       {/* Search + Filter Bar */}
@@ -60,21 +63,21 @@ function ToolsPageInner() {
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`btn-cyber btn-secondary flex items-center gap-2 ${showFilters ? 'border-cyber-cyan/50' : ''}`}
+          className={`btn-cyber btn-secondary flex items-center gap-2 ${showFilters ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-foreground' : ''}`}
         >
           <Filter size={14} /> Filters
           {(selectedCategory || selectedDifficulty || selectedExecution) && (
-            <span className="w-2 h-2 rounded-full bg-cyber-cyan" />
+            <span className="h-2 w-2 rounded-full bg-cyber-cyan" />
           )}
         </button>
       </div>
 
       {/* Filter Panel */}
       {showFilters && (
-        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="glass-card p-4 space-y-4">
+        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="glass-card space-y-4 p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Filters</span>
-            <button onClick={clearFilters} className="text-xs text-cyber-cyan hover:underline">Clear all</button>
+            <button onClick={clearFilters} className="text-xs text-cyber-cyan hover:text-foreground">Clear all</button>
           </div>
 
           {/* Category */}
@@ -85,7 +88,7 @@ function ToolsPageInner() {
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(selectedCategory === cat.id ? '' : cat.id)}
-                  className={`badge cursor-pointer transition-all ${selectedCategory === cat.id ? 'badge-cyan' : 'bg-muted text-muted-foreground border border-border hover:border-border-bright'}`}
+                  className={`badge cursor-pointer transition-all ${selectedCategory === cat.id ? 'badge-cyan' : 'border border-border bg-[color:var(--panel-subtle)] text-muted-foreground hover:border-border-bright hover:bg-surface-hover'}`}
                 >
                   {cat.name}
                 </button>
@@ -101,7 +104,7 @@ function ToolsPageInner() {
                 <button
                   key={d}
                   onClick={() => setSelectedDifficulty(selectedDifficulty === d ? '' : d)}
-                  className={`badge cursor-pointer transition-all ${selectedDifficulty === d ? 'badge-green' : 'bg-muted text-muted-foreground border border-border hover:border-border-bright'}`}
+                  className={`badge cursor-pointer transition-all ${selectedDifficulty === d ? 'badge-green' : 'border border-border bg-[color:var(--panel-subtle)] text-muted-foreground hover:border-border-bright hover:bg-surface-hover'}`}
                 >
                   {d}
                 </button>
@@ -117,7 +120,7 @@ function ToolsPageInner() {
                 <button
                   key={e}
                   onClick={() => setSelectedExecution(selectedExecution === e ? '' : e)}
-                  className={`badge cursor-pointer transition-all ${selectedExecution === e ? 'badge-purple' : 'bg-muted text-muted-foreground border border-border hover:border-border-bright'}`}
+                  className={`badge cursor-pointer transition-all ${selectedExecution === e ? 'badge-purple' : 'border border-border bg-[color:var(--panel-subtle)] text-muted-foreground hover:border-border-bright hover:bg-surface-hover'}`}
                 >
                   {e}-side
                 </button>
@@ -136,14 +139,14 @@ function ToolsPageInner() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: Math.min(i * 0.03, 0.3) }}
           >
-            <div className="glass-card interactive-card p-4 hover:border-cyber-cyan/30 transition-all group h-full flex flex-col">
+            <div className="glass-card interactive-card group flex h-full flex-col p-4 transition-all hover:border-[color:var(--accent-border)]">
               <div className="flex items-start justify-between mb-2">
                 <Link href={`/tools/${tool.slug}`} className="flex-1">
                   <h3 className="font-medium text-sm group-hover:text-cyber-cyan transition-colors">{tool.name}</h3>
                 </Link>
                 <button
                   onClick={() => toggleFavorite(tool.id)}
-                  className="shrink-0 p-1 rounded hover:bg-surface-hover transition-colors"
+                  className="shrink-0 rounded-lg p-1 transition-colors hover:bg-surface-hover"
                   title={favorites.includes(tool.id) ? 'Remove from favorites' : 'Add to favorites'}
                   aria-label={`${favorites.includes(tool.id) ? 'Remove' : 'Add'} ${tool.name} ${favorites.includes(tool.id) ? 'from' : 'to'} favorites`}
                 >
@@ -169,7 +172,7 @@ function ToolsPageInner() {
       {filteredTools.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           <p className="text-sm">No tools found matching your criteria.</p>
-          <button onClick={clearFilters} className="text-cyber-cyan text-sm mt-2 hover:underline">Clear filters</button>
+          <button onClick={clearFilters} className="mt-2 text-sm text-cyber-cyan hover:text-foreground">Clear filters</button>
         </div>
       )}
     </div>
