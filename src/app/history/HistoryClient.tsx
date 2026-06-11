@@ -14,7 +14,7 @@ export default function HistoryPage() {
   useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
+    <div className="page-shell-tight space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><History size={24} className="text-muted-foreground" /> Scan History</h1>
@@ -42,27 +42,29 @@ export default function HistoryPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: Math.min(i * 0.03, 0.3) }}
-                className="glass-card p-4 flex items-center gap-4"
+                className="glass-card p-4"
               >
-                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${entry.status === 'success' ? 'bg-status-pass' : entry.status === 'error' ? 'bg-status-fail' : 'bg-status-warn'}`} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{entry.toolName}</span>
-                    <span className="badge badge-cyan text-[10px]">{tool?.category || 'unknown'}</span>
+                <div className="flex gap-4">
+                  <div className={`mt-1 h-2.5 w-2.5 rounded-full shrink-0 ${entry.status === 'success' ? 'bg-status-pass' : entry.status === 'error' ? 'bg-status-fail' : 'bg-status-warn'}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-sm">{entry.toolName}</span>
+                      <span className="badge badge-cyan text-xs">{tool?.category || 'unknown'}</span>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground truncate">{entry.input}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{entry.resultSummary}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</span>
+                      {tool && (
+                        <Link href={`/tools/${tool.slug}`} className="btn-cyber btn-secondary btn-sm" title={`Open ${tool.name}`} aria-label={`Open ${tool.name}`}>
+                          <ExternalLink size={12} /> Open tool
+                        </Link>
+                      )}
+                      <button onClick={() => removeEntry(entry.id)} className="btn-cyber btn-ghost btn-sm text-muted-foreground hover:text-cyber-red" title="Delete history entry" aria-label={`Delete history entry for ${entry.toolName}`}>
+                        <Trash2 size={12} /> Remove
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5">{entry.input}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{entry.resultSummary}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</span>
-                  {tool && (
-                    <Link href={`/tools/${tool.slug}`} className="btn-cyber btn-ghost btn-sm p-1" title={`Open ${tool.name}`} aria-label={`Open ${tool.name}`}>
-                      <ExternalLink size={12} />
-                    </Link>
-                  )}
-                  <button onClick={() => removeEntry(entry.id)} className="btn-cyber btn-ghost btn-sm p-1 text-muted-foreground hover:text-cyber-red" title="Delete history entry" aria-label={`Delete history entry for ${entry.toolName}`}>
-                    <Trash2 size={12} />
-                  </button>
                 </div>
               </motion.div>
             );

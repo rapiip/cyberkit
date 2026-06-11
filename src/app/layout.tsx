@@ -62,7 +62,7 @@ export default function RootLayout({
       <body className="min-h-full flex">
         <MotionProvider>
           <Sidebar />
-          <main className="flex-1 min-h-screen overflow-x-hidden">
+          <main id="main-content" className="flex-1 min-h-screen overflow-x-hidden pt-16 md:pt-0">
             {children}
           </main>
           <CommandPalette />

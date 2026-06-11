@@ -41,7 +41,7 @@ function ToolsPageInner() {
   const clearFilters = () => { setSelectedCategory(''); setSelectedDifficulty(''); setSelectedExecution(''); setQuery(''); };
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="page-shell space-y-6">
       <div>
         <h1 className="text-2xl font-bold">All Tools</h1>
         <p className="text-sm text-muted-foreground mt-1">{allToolMetadata.length} cybersecurity tools available</p>
@@ -136,7 +136,7 @@ function ToolsPageInner() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: Math.min(i * 0.03, 0.3) }}
           >
-            <div className="glass-card p-4 hover:border-cyber-cyan/30 transition-all group h-full flex flex-col">
+            <div className="glass-card interactive-card p-4 hover:border-cyber-cyan/30 transition-all group h-full flex flex-col">
               <div className="flex items-start justify-between mb-2">
                 <Link href={`/tools/${tool.slug}`} className="flex-1">
                   <h3 className="font-medium text-sm group-hover:text-cyber-cyan transition-colors">{tool.name}</h3>
@@ -157,9 +157,9 @@ function ToolsPageInner() {
                 <p className="text-xs text-muted-foreground mb-3">{tool.shortDescription}</p>
               </Link>
               <div className="flex items-center gap-2 mt-auto">
-                <span className="badge badge-cyan text-[10px]">{tool.category}</span>
-                <span className="badge badge-purple text-[10px]">{tool.difficulty}</span>
-                <span className="badge badge-green text-[10px]">{tool.executionType}</span>
+                <span className="badge badge-cyan text-xs">{tool.category}</span>
+                <span className="badge badge-purple text-xs">{tool.difficulty}</span>
+                <span className="badge badge-green text-xs">{tool.executionType}</span>
               </div>
             </div>
           </motion.div>

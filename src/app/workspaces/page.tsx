@@ -23,7 +23,7 @@ export default function WorkspacesPage() {
   }));
 
   return (
-    <div className="mx-auto max-w-7xl space-y-10 p-4 pt-20 md:p-8">
+    <div className="page-shell space-y-10">
       <header className="max-w-3xl space-y-3">
         <div className="badge badge-cyan">11 focused workspaces</div>
         <h1 className="text-3xl font-bold md:text-4xl">Choose a security workflow</h1>
@@ -49,7 +49,7 @@ export default function WorkspacesPage() {
               <Link
                 key={workspace.id}
                 href={workspace.canonicalPath}
-                className="glass-card group flex min-h-52 flex-col p-5 transition-all hover:border-cyber-cyan/35"
+                className="glass-card interactive-card group flex min-h-52 flex-col p-5 transition-all hover:border-cyber-cyan/35"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/10 text-cyber-cyan">
@@ -85,7 +85,7 @@ export default function WorkspacesPage() {
         </div>
         <Link
           href="/labs"
-          className="glass-card group flex max-w-2xl items-start gap-4 p-5 transition-all hover:border-cyber-purple/35"
+          className="glass-card interactive-card group flex max-w-2xl items-start gap-4 p-5 transition-all hover:border-cyber-purple/35"
         >
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-cyber-purple/20 bg-cyber-purple/10 text-cyber-purple">
             <FlaskConical size={22} />

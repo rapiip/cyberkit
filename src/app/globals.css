@@ -66,6 +66,10 @@ body {
   overflow-x: hidden;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* ═══════ Scrollbar ═══════ */
 
 ::-webkit-scrollbar {
@@ -98,10 +102,14 @@ body {
   border: 1px solid rgba(0, 240, 255, 0.08);
   border-radius: 12px;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.glass-card:hover {
+.interactive-card {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.interactive-card:hover {
   border-color: rgba(0, 240, 255, 0.25);
   background: rgba(10, 14, 26, 0.6);
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 240, 255, 0.08);
@@ -226,6 +234,7 @@ body {
   border: none;
   outline: none;
   font-family: inherit;
+  text-decoration: none;
 }
 
 .btn-primary {
@@ -320,7 +329,7 @@ textarea.input-cyber {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   border-radius: 6px;
   text-transform: uppercase;
@@ -369,8 +378,8 @@ textarea.input-cyber {
 }
 
 .tab-item {
-  padding: 6px 16px;
-  font-size: 13px;
+  padding: 8px 16px;
+  font-size: 14px;
   font-weight: 500;
   color: #94a3b8;
   border-radius: 7px;
@@ -389,6 +398,42 @@ textarea.input-cyber {
 .tab-item.active {
   color: #00f0ff;
   background: rgba(0, 240, 255, 0.1);
+}
+
+:focus-visible {
+  outline: 2px solid rgba(0, 240, 255, 0.7);
+  outline-offset: 2px;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="tab"]:focus-visible,
+[role="option"]:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.16);
+}
+
+.page-shell {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 80rem;
+  padding: 1.25rem;
+}
+
+.page-shell-tight {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 64rem;
+  padding: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .page-shell,
+  .page-shell-tight {
+    padding: 2rem;
+  }
 }
 
 /* ═══════ Score/Grade ═══════ */

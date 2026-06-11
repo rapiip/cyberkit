@@ -55,6 +55,12 @@ interface RedirectHop {
   location?: string;
 }
 
+function scoreTone(score: number) {
+  if (score >= 85) return 'strong';
+  if (score >= 70) return 'watch';
+  return 'risk';
+}
+
 export default function AuditPage() {
   const [url, setUrl] = useState('');
   const [running, setRunning] = useState(false);
@@ -154,34 +160,16 @@ export default function AuditPage() {
 
       const realChecks: AuditCheck[] = resData.checks || [];
 
-      // 2. Play satisfying UI sequential reveal animation for premium UX
-      const activeChecks = [...initialChecks];
-      for (let i = 0; i < auditCheckList.length; i++) {
-        // Mark current running
-        activeChecks[i] = {
-          ...activeChecks[i],
-          status: 'running',
-          message: 'Resolving parameters...',
+      const resolvedChecks = auditCheckList.map((name) => {
+        const matchedReal = realChecks.find((rc) => rc.name === name);
+        return matchedReal ?? {
+          name,
+          status: 'warn' as const,
+          message: 'Metric absent',
+          details: 'Could not obtain security metric detail.',
         };
-        setChecks([...activeChecks]);
-
-        // Small delay to simulate scanning step
-        await new Promise((r) => setTimeout(r, 250));
-
-        // Find the matched result from API response
-        const matchedReal = realChecks.find((rc) => rc.name === auditCheckList[i]);
-        if (matchedReal) {
-          activeChecks[i] = matchedReal;
-        } else {
-          activeChecks[i] = {
-            name: auditCheckList[i],
-            status: 'warn',
-            message: 'Metric absent',
-            details: 'Could not obtain security metric detail.',
-          };
-        }
-        setChecks([...activeChecks]);
-      }
+      });
+      setChecks(resolvedChecks);
 
       setScore(resData.score ?? 0);
       setGrade(resData.grade || 'F');
@@ -303,15 +291,21 @@ ${(resData.findings || [])
     }
   };
 
+  const passedCount = checks.filter((c) => c.status === 'pass').length;
+  const warnCount = checks.filter((c) => c.status === 'warn').length;
+  const failedCount = checks.filter((c) => c.status === 'fail' || c.status === 'error').length;
+  const topFindings = findings.slice(0, 3);
+  const currentTone = score !== null ? scoreTone(score) : null;
+
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
+    <div className="page-shell-tight max-w-5xl space-y-6">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-3xl font-bold flex items-center gap-3">
           <Shield size={32} className="text-cyber-cyan text-glow-cyan" /> 
           Website Security Audit
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Perform a real-time cybersecurity diagnostic audit on any domain or URL to evaluate security headers and SSL status.
+          Run a focused website audit for transport security, response headers, policy coverage, and obvious exposure.
         </p>
         <p className="text-xs text-muted-foreground mt-2">
           The scan performs outbound internet requests against the target, follows only bounded public redirects, and compares each new run against the last successful baseline in this browser session.
@@ -327,7 +321,7 @@ ${(resData.findings || [])
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="e.g. google.com or https://github.com"
-              className="input-cyber pl-12 pr-4 py-3 text-sm"
+            className="input-cyber pl-12 pr-4 py-3 text-sm"
               onKeyDown={(e) => e.key === 'Enter' && runAudit()}
               disabled={running}
             />
@@ -355,7 +349,7 @@ ${(resData.findings || [])
           <div className="mt-4 p-3 bg-status-fail/10 border border-status-fail/20 text-status-fail text-xs rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <div>
               <div className="font-semibold">{errorMsg}</div>
-              {errorCode && <div className="text-[10px] font-mono text-status-fail/80 mt-1">{errorCode}</div>}
+              {errorCode && <div className="mt-1 text-xs font-mono text-status-fail/80">{errorCode}</div>}
             </div>
             {errorRetryable && (
               <button
@@ -372,89 +366,114 @@ ${(resData.findings || [])
 
       {/* Audit Score Output */}
       {score !== null && (
-        <motion.div
+        <motion.section
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="glass-card p-6 flex flex-col md:flex-row items-center justify-around gap-6"
+          className="glass-card p-6 space-y-6"
         >
-          <div className="text-center md:text-left space-y-2">
-            <h2 className="text-lg font-semibold text-foreground">Security Score Summary</h2>
-            <p className="text-xs text-muted-foreground max-w-sm">
-              Audit results indicate key security attributes are active. Review failures and warnings below to strengthen protection against exploits.
-            </p>
-            <div className="flex gap-4 text-xs font-mono pt-2">
-              <span className="text-status-pass">{checks.filter((c) => c.status === 'pass').length} Passed</span>
-              <span className="text-status-warn">{checks.filter((c) => c.status === 'warn').length} Warnings</span>
-              <span className="text-status-fail">{checks.filter((c) => c.status === 'fail' || c.status === 'error').length} Failed</span>
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className={`badge ${
+                  currentTone === 'strong'
+                    ? 'badge-green'
+                    : currentTone === 'watch'
+                      ? 'badge-amber'
+                      : 'badge-red'
+                }`}>
+                  {currentTone === 'strong' ? 'Strong baseline' : currentTone === 'watch' ? 'Needs review' : 'Immediate attention'}
+                </span>
+                <span className="text-sm text-muted-foreground">Grade {grade}</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-foreground">Security summary</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                  Start with the failures and warnings first. The checklist and raw evidence below provide the technical detail for follow-up work.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3 text-sm">
+                <span className="rounded-lg border border-status-pass/20 bg-status-pass/10 px-3 py-2 text-status-pass">{passedCount} passed</span>
+                <span className="rounded-lg border border-status-warn/20 bg-status-warn/10 px-3 py-2 text-status-warn">{warnCount} warnings</span>
+                <span className="rounded-lg border border-status-fail/20 bg-status-fail/10 px-3 py-2 text-status-fail">{failedCount} failed</span>
+              </div>
             </div>
-            
-            <div className="pt-3 flex justify-center md:justify-start">
-              <button
-                onClick={() => {
-                  let targetUrl = url.trim();
-                  if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-                    targetUrl = 'https://' + targetUrl;
-                  }
-                  try {
-                    const host = new URL(targetUrl).hostname;
-                    exportAuditToPDF(`Audit: ${host}`, targetUrl, auditReport);
-                  } catch {
-                    exportAuditToPDF(`Audit: ${targetUrl}`, targetUrl, auditReport);
-                  }
-                }}
-                className="btn-cyber btn-secondary btn-sm"
-              >
-                <FileDown size={14} /> Export PDF Report
-              </button>
-            </div>
-          </div>
 
+            <div className="flex items-center gap-6 self-start rounded-2xl border border-border bg-surface/70 px-5 py-4">
+              <div className="relative flex items-center justify-center">
+                <svg className="h-24 w-24 -rotate-90 transform">
+                  <circle cx="48" cy="48" r="40" className="stroke-muted fill-none" strokeWidth="6" />
+                  <circle
+                    cx="48"
+                    cy="48"
+                    r="40"
+                    className={`fill-none transition-all duration-700 ${
+                      grade === 'A' || grade === 'B'
+                        ? 'stroke-status-pass'
+                        : grade === 'C'
+                          ? 'stroke-status-warn'
+                          : 'stroke-status-fail'
+                    }`}
+                    strokeWidth="6"
+                    strokeDasharray="251.2"
+                    strokeDashoffset={251.2 - (251.2 * score) / 100}
+                  />
+                </svg>
+                <div className="absolute flex flex-col items-center">
+                  <span className="text-2xl font-bold text-foreground">{score}</span>
+                  <span className="text-xs text-muted-foreground">score</span>
+                </div>
+              </div>
 
-          <div className="flex items-center gap-6">
-            <div className="relative flex items-center justify-center">
-              {/* Outer Score Circle */}
-              <svg className="w-24 h-24 transform -rotate-90">
-                <circle cx="48" cy="48" r="40" className="stroke-muted fill-none" strokeWidth="6" />
-                <circle
-                  cx="48"
-                  cy="48"
-                  r="40"
-                  className={`fill-none transition-all duration-1000 ${
-                    grade === 'A' || grade === 'B'
-                      ? 'stroke-status-pass'
-                      : grade === 'C'
-                      ? 'stroke-status-warn'
-                      : 'stroke-status-fail'
+              <div className="space-y-3">
+                <div
+                  className={`flex h-16 w-16 items-center justify-center rounded-2xl border-2 text-3xl font-extrabold font-mono ${
+                    grade === 'A'
+                      ? 'border-status-pass bg-status-pass/10 text-status-pass'
+                      : grade === 'B'
+                        ? 'border-status-pass bg-status-pass/10 text-status-pass'
+                        : grade === 'C'
+                          ? 'border-status-warn bg-status-warn/10 text-status-warn'
+                          : 'border-status-fail bg-status-fail/10 text-status-fail'
                   }`}
-                  strokeWidth="6"
-                  strokeDasharray="251.2"
-                  strokeDashoffset={251.2 - (251.2 * score) / 100}
-                />
-              </svg>
-              <div className="absolute flex flex-col items-center">
-                <span className="text-2xl font-bold text-foreground">{score}</span>
-                <span className="text-[10px] text-muted-foreground font-mono">SCORE</span>
+                >
+                  {grade}
+                </div>
+                <button
+                  onClick={() => {
+                    let targetUrl = url.trim();
+                    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+                      targetUrl = 'https://' + targetUrl;
+                    }
+                    try {
+                      const host = new URL(targetUrl).hostname;
+                      exportAuditToPDF(`Audit: ${host}`, targetUrl, auditReport);
+                    } catch {
+                      exportAuditToPDF(`Audit: ${targetUrl}`, targetUrl, auditReport);
+                    }
+                  }}
+                  className="btn-cyber btn-secondary btn-sm w-full"
+                >
+                  <FileDown size={14} /> Export PDF
+                </button>
               </div>
-            </div>
-
-            <div className="text-center">
-              <div
-                className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl font-extrabold font-mono border-2 shadow-lg ${
-                  grade === 'A'
-                    ? 'bg-status-pass/10 border-status-pass text-status-pass shadow-status-pass/20'
-                    : grade === 'B'
-                    ? 'bg-status-pass/10 border-status-pass text-status-pass shadow-status-pass/10'
-                    : grade === 'C'
-                    ? 'bg-status-warn/10 border-status-warn text-status-warn shadow-status-warn/20'
-                    : 'bg-status-fail/10 border-status-fail text-status-fail shadow-status-fail/20'
-                }`}
-              >
-                {grade}
-              </div>
-              <span className="text-[10px] text-muted-foreground font-mono mt-1 block">GRADE</span>
             </div>
           </div>
-        </motion.div>
+
+          {topFindings.length > 0 && (
+            <div className="grid gap-3 lg:grid-cols-3">
+              {topFindings.map((finding) => (
+                <div key={finding.id} className="rounded-xl border border-border bg-surface/70 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-foreground">{finding.title}</span>
+                    <span className="badge badge-red">{finding.severity}</span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{finding.evidence}</p>
+                  <p className="mt-2 text-sm text-foreground">Next step: {finding.remediation}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.section>
       )}
 
       {comparison && (
@@ -462,7 +481,7 @@ ${(resData.findings || [])
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-foreground">Baseline Comparison</h2>
             <span
-              className={`text-[10px] font-mono uppercase px-2 py-1 rounded border ${
+              className={`text-xs font-medium uppercase px-2 py-1 rounded border ${
                 comparison.regression
                   ? 'bg-status-fail/5 border-status-fail/20 text-status-fail'
                   : 'bg-status-pass/5 border-status-pass/20 text-status-pass'
@@ -472,19 +491,19 @@ ${(resData.findings || [])
             </span>
           </div>
           <div className="grid gap-3 sm:grid-cols-3 text-sm">
-            <div className="glass-panel p-3 rounded-lg">
-              <div className="text-xs text-muted-foreground">Score Delta</div>
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <div className="text-sm text-muted-foreground">Score Delta</div>
               <div className={comparison.scoreDelta < 0 ? 'text-status-fail font-semibold' : 'text-status-pass font-semibold'}>
                 {comparison.scoreDelta >= 0 ? '+' : ''}
                 {comparison.scoreDelta}
               </div>
             </div>
-            <div className="glass-panel p-3 rounded-lg">
-              <div className="text-xs text-muted-foreground">Introduced</div>
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <div className="text-sm text-muted-foreground">Introduced</div>
               <div className="font-semibold text-foreground">{comparison.introducedCount}</div>
             </div>
-            <div className="glass-panel p-3 rounded-lg">
-              <div className="text-xs text-muted-foreground">Resolved</div>
+            <div className="rounded-lg border border-border bg-surface p-3">
+              <div className="text-sm text-muted-foreground">Resolved</div>
               <div className="font-semibold text-foreground">{comparison.resolvedCount}</div>
             </div>
           </div>
@@ -501,7 +520,7 @@ ${(resData.findings || [])
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {Object.entries(scoring.documentedWeights).map(([key, value]) => (
-              <div key={key} className="glass-panel rounded-lg px-3 py-2 text-xs flex items-center justify-between gap-3">
+              <div key={key} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">{key}</span>
                 <span className="font-mono text-foreground">{value}</span>
               </div>
@@ -515,7 +534,7 @@ ${(resData.findings || [])
         <div className="glass-card overflow-hidden divide-y divide-border">
           <div className="bg-surface px-6 py-4 flex items-center justify-between border-b border-border">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Diagnostic Checklist</span>
-            <span className="text-xs text-muted-foreground font-mono">
+            <span className="text-sm text-muted-foreground">
               {checks.filter((c) => c.status !== 'pending' && c.status !== 'running').length} / {checks.length} complete
             </span>
           </div>
@@ -536,7 +555,7 @@ ${(resData.findings || [])
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-foreground">{check.name}</span>
                   <span
-                    className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded border ${
+                    className={`text-xs font-medium uppercase px-2 py-0.5 rounded border ${
                       check.status === 'pass'
                         ? 'bg-status-pass/5 border-status-pass/20 text-status-pass'
                         : check.status === 'fail'
@@ -551,9 +570,9 @@ ${(resData.findings || [])
                     {check.status}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{check.message}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{check.message}</p>
                 {check.details && (
-                  <p className="text-[11px] font-mono text-muted-foreground mt-1 pl-2 border-l border-border">
+                  <p className="text-xs font-mono text-muted-foreground mt-1 pl-2 border-l border-border">
                     {check.details}
                   </p>
                 )}
@@ -575,17 +594,17 @@ ${(resData.findings || [])
             <div key={finding.id} className="px-6 py-4 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-foreground">{finding.title}</span>
-                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border bg-status-fail/5 border-status-fail/20 text-status-fail">
+                <span className="text-xs font-medium uppercase px-2 py-0.5 rounded border bg-status-fail/5 border-status-fail/20 text-status-fail">
                   {finding.severity}
                 </span>
-                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded border bg-cyber-cyan/5 border-cyber-cyan/20 text-cyber-cyan">
+                <span className="text-xs font-medium uppercase px-2 py-0.5 rounded border bg-cyber-cyan/5 border-cyber-cyan/20 text-cyber-cyan">
                   {finding.confidence}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">{finding.evidence}</p>
-              <p className="text-xs text-foreground">Remediation: {finding.remediation}</p>
-              <p className="text-[11px] font-mono text-muted-foreground">Source: {finding.source}</p>
-              <p className="text-[11px] text-muted-foreground break-all">
+              <p className="text-sm text-muted-foreground">{finding.evidence}</p>
+              <p className="text-sm text-foreground">Remediation: {finding.remediation}</p>
+              <p className="text-xs font-mono text-muted-foreground">Source: {finding.source}</p>
+              <p className="text-xs text-muted-foreground break-all">
                 References: {finding.references.join(', ') || 'N/A'}
               </p>
             </div>
@@ -604,7 +623,7 @@ ${(resData.findings || [])
           {redirectChain.length > 0 ? (
             <div className="space-y-2">
               {redirectChain.map((hop, index) => (
-                <div key={`${hop.url}-${index}`} className="glass-panel rounded-lg p-3 text-xs">
+                <div key={`${hop.url}-${index}`} className="rounded-lg border border-border bg-surface p-3 text-sm">
                   <div className="font-mono text-foreground">{hop.status} {hop.url}</div>
                   {hop.location && <div className="text-muted-foreground mt-1">Location: {hop.location}</div>}
                 </div>

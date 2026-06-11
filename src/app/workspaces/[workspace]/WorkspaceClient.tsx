@@ -71,7 +71,7 @@ export default function WorkspaceClient({
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 pt-20 md:p-8">
+    <div className="page-shell space-y-6">
       <header className="glass-card relative overflow-hidden p-6 md:p-8">
         <div className="absolute inset-y-0 right-0 w-1/3 bg-gradient-to-l from-cyber-cyan/10 to-transparent" />
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -153,7 +153,7 @@ export default function WorkspaceClient({
 
             {primaryTools.length > 0 && (
               <div className="mb-4">
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Workflow
                 </p>
                 <div className="flex flex-wrap gap-2" role="tablist" aria-label={`${workspace.name} workflow panels`}>
@@ -185,7 +185,7 @@ export default function WorkspaceClient({
               return (
                 <div key={group.id} className="border-t border-border py-4 last:pb-0">
                   <p className="text-xs font-semibold text-foreground">{group.name}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">{group.description}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{group.description}</p>
                   <div className="mt-3 flex flex-wrap gap-2" role="tablist" aria-label={group.name}>
                     {groupTools.map((tool) => (
                       <button

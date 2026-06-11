@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, Trash2, Download, Copy, Clock, FileDown, Search, X, Eye } from 'lucide-react';
 import { useReportsStore } from '@/lib/store';
@@ -14,8 +14,13 @@ export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<SavedReport | null>(null);
   const [targetFilter, setTargetFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const closePreviewRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
+  useEffect(() => {
+    if (!selectedReport) return;
+    window.setTimeout(() => closePreviewRef.current?.focus(), 0);
+  }, [selectedReport]);
 
   const filteredReports = useMemo(() => {
     return reports.filter((report) => {
@@ -44,7 +49,7 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
+    <div className="page-shell-tight space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><FileText size={24} className="text-muted-foreground" /> Saved Reports</h1>
@@ -91,21 +96,13 @@ export default function ReportsPage() {
         <div className="space-y-3">
           {filteredReports.map((report, i) => (
             <motion.div key={report.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="glass-card p-5">
-              <div className="flex items-start justify-between mb-2">
+              <div className="mb-2 flex items-start justify-between gap-4">
                 <div>
                   <h3 className="font-medium text-sm">{report.title}</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">{report.target}</p>
                 </div>
-                 <div className="flex items-center gap-1">
-                  <button onClick={() => setSelectedReport(report)} className="btn-cyber btn-ghost btn-sm p-1" title="View report" aria-label={`View report ${report.title}`}><Eye size={12} /></button>
-                  <button onClick={() => handleCopy(report.content)} className="btn-cyber btn-ghost btn-sm p-1" title="Copy report to clipboard" aria-label={`Copy report ${report.title} to clipboard`}><Copy size={12} /></button>
-                  <button onClick={() => handleExport(report, 'markdown')} className="btn-cyber btn-ghost btn-sm p-1" title="Download Markdown" aria-label={`Download ${report.title} as Markdown`}><Download size={12} /></button>
-                  <button onClick={() => handleExport(report, 'json')} className="btn-cyber btn-ghost btn-sm p-1" title="Download JSON" aria-label={`Download ${report.title} as JSON`}>JSON</button>
-                  <button onClick={() => exportAuditToPDF(report.title, report.target, report.content)} className="btn-cyber btn-ghost btn-sm p-1 text-cyber-cyan hover:bg-cyber-cyan/10" title="Export to PDF" aria-label={`Export ${report.title} to PDF`}><FileDown size={12} /></button>
-                  <button onClick={() => removeReport(report.id)} className="btn-cyber btn-ghost btn-sm p-1 text-muted-foreground hover:text-cyber-red" title="Delete report" aria-label={`Delete report ${report.title}`}><Trash2 size={12} /></button>
-                </div>
               </div>
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Clock size={10} />
                 <span>{new Date(report.createdAt).toLocaleString()}</span>
                 <span className="badge badge-cyan text-[9px]">{report.format}</span>
@@ -114,6 +111,14 @@ export default function ReportsPage() {
               <pre className="mt-3 text-xs font-mono p-3 rounded-lg bg-surface max-h-32 overflow-auto text-muted-foreground">
                 {report.content.substring(0, 500)}{report.content.length > 500 ? '...' : ''}
               </pre>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button onClick={() => setSelectedReport(report)} className="btn-cyber btn-primary btn-sm" title="View report" aria-label={`View report ${report.title}`}><Eye size={12} /> Open report</button>
+                <button onClick={() => handleCopy(report.content)} className="btn-cyber btn-secondary btn-sm" title="Copy report to clipboard" aria-label={`Copy report ${report.title} to clipboard`}><Copy size={12} /> Copy</button>
+                <button onClick={() => handleExport(report, 'markdown')} className="btn-cyber btn-secondary btn-sm" title="Download Markdown" aria-label={`Download ${report.title} as Markdown`}><Download size={12} /> Markdown</button>
+                <button onClick={() => handleExport(report, 'json')} className="btn-cyber btn-secondary btn-sm" title="Download JSON" aria-label={`Download ${report.title} as JSON`}>JSON</button>
+                <button onClick={() => exportAuditToPDF(report.title, report.target, report.content)} className="btn-cyber btn-secondary btn-sm text-cyber-cyan hover:bg-cyber-cyan/10" title="Export to PDF" aria-label={`Export ${report.title} to PDF`}><FileDown size={12} /> PDF</button>
+                <button onClick={() => removeReport(report.id)} className="btn-cyber btn-ghost btn-sm text-muted-foreground hover:text-cyber-red" title="Delete report" aria-label={`Delete report ${report.title}`}><Trash2 size={12} /> Remove</button>
+              </div>
             </motion.div>
           ))}
         </div>
@@ -121,13 +126,13 @@ export default function ReportsPage() {
 
       {selectedReport && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setSelectedReport(null)}>
-          <div className="glass-card w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col" onClick={(event) => event.stopPropagation()}>
+          <div role="dialog" aria-modal="true" aria-labelledby="report-preview-title" className="glass-card w-full max-w-3xl max-h-[85vh] overflow-hidden flex flex-col" onClick={(event) => event.stopPropagation()}>
             <div className="px-5 py-4 border-b border-border flex items-start justify-between gap-4">
               <div>
-                <h2 className="font-semibold text-sm">{selectedReport.title}</h2>
+                <h2 id="report-preview-title" className="font-semibold text-sm">{selectedReport.title}</h2>
                 <p className="text-xs text-muted-foreground mt-0.5 break-all">{selectedReport.target}</p>
               </div>
-              <button onClick={() => setSelectedReport(null)} className="btn-cyber btn-ghost btn-sm p-1" title="Close" aria-label="Close report preview">
+              <button ref={closePreviewRef} onClick={() => setSelectedReport(null)} className="btn-cyber btn-ghost btn-sm p-1" title="Close" aria-label="Close report preview">
                 <X size={14} />
               </button>
             </div>

@@ -1,16 +1,16 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Check,
   Code,
   Copy,
   Download,
+  FileUp,
   FileText,
   Info,
   Play,
-  Upload,
   X,
 } from 'lucide-react';
 import { useHistoryStore } from '@/lib/store';
@@ -37,11 +37,38 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
   const [progress, setProgress] = useState<ToolExecutionProgress | null>(null);
   const [copied, setCopied] = useState(false);
   const [activeResultTab, setActiveResultTab] = useState<'summary' | 'raw' | 'explanation'>('summary');
+  const [dragOverInputId, setDragOverInputId] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const abortControllerRef = useRef<AbortController | null>(null);
   const addEntry = useHistoryStore((state) => state.addEntry);
 
+  const validationErrors = useMemo(() => {
+    const nextErrors: Record<string, string> = {};
+    tool.inputs.forEach((input) => {
+      const value = formValues[input.id];
+      if (!input.required) return;
+      if (input.type === 'checkbox') {
+        if (!value) nextErrors[input.id] = `${input.label} must be enabled before running this panel.`;
+        return;
+      }
+      if (input.type === 'file') {
+        const hasFile = Array.isArray(value) ? value.length > 0 : value instanceof File;
+        if (!hasFile) nextErrors[input.id] = `${input.label} is required.`;
+        return;
+      }
+      if (typeof value === 'string' && !value.trim()) {
+        nextErrors[input.id] = `${input.label} is required.`;
+      }
+    });
+    return nextErrors;
+  }, [formValues, tool.inputs]);
+
+  const canRun = Object.keys(validationErrors).length === 0 && !running;
+
   const handleRun = async () => {
+    setSubmitAttempted(true);
+    if (Object.keys(validationErrors).length > 0) return;
     setRunning(true);
     setResult(null);
     setProgress(null);
@@ -122,8 +149,22 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
     setFormValues((current) => ({ ...current, [input.id]: value }));
   };
 
+  const handleFileSelection = (input: ToolInput, files: FileList | null) => {
+    handleInputChange(
+      input,
+      input.multiple ? Array.from(files || []) : files?.[0] || null
+    );
+  };
+
+  const clearFileSelection = (inputId: string) => {
+    const inputElement = fileInputRefs.current[inputId];
+    if (inputElement) inputElement.value = '';
+    setFormValues((current) => ({ ...current, [inputId]: '' }));
+  };
+
   const renderInput = (input: ToolInput) => {
     const inputId = `${tool.id}-${input.id}`;
+    const errorMessage = submitAttempted ? validationErrors[input.id] : undefined;
     switch (input.type) {
       case 'textarea':
         return (
@@ -132,6 +173,8 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
             value={(formValues[input.id] as string) || ''}
             onChange={(event) => handleInputChange(input, event.target.value)}
             placeholder={input.placeholder}
+            aria-invalid={Boolean(errorMessage)}
+            aria-describedby={errorMessage ? `${inputId}-error` : undefined}
             className="input-cyber font-mono text-sm"
             rows={5}
           />
@@ -142,6 +185,8 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
             id={inputId}
             value={(formValues[input.id] as string) || ''}
             onChange={(event) => handleInputChange(input, event.target.value)}
+            aria-invalid={Boolean(errorMessage)}
+            aria-describedby={errorMessage ? `${inputId}-error` : undefined}
             className="input-cyber text-sm"
           >
             {input.options?.map((option) => (
@@ -161,6 +206,8 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
               handleInputChange(input, event.target.value ? Number(event.target.value) : '')
             }
             placeholder={input.placeholder}
+            aria-invalid={Boolean(errorMessage)}
+            aria-describedby={errorMessage ? `${inputId}-error` : undefined}
             className="input-cyber text-sm"
           />
         );
@@ -172,14 +219,22 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
               type="checkbox"
               checked={Boolean(formValues[input.id])}
               onChange={(event) => handleInputChange(input, event.target.checked)}
+              aria-invalid={Boolean(errorMessage)}
+              aria-describedby={errorMessage ? `${inputId}-error` : undefined}
               className="h-4 w-4 rounded border-border accent-cyber-cyan"
             />
             <span className="text-sm text-muted-foreground">{input.label}</span>
           </label>
         );
       case 'file':
+        const selectedValue = formValues[input.id];
+        const selectedFiles = Array.isArray(selectedValue)
+          ? selectedValue as File[]
+          : selectedValue instanceof File
+            ? [selectedValue]
+            : [];
         return (
-          <div>
+          <div className="space-y-2">
             <input
               id={inputId}
               ref={(element) => {
@@ -187,30 +242,66 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
               }}
               type="file"
               multiple={input.multiple}
-              onChange={(event) =>
-                handleInputChange(
-                  input,
-                  input.multiple
-                    ? Array.from(event.target.files || [])
-                    : event.target.files?.[0] || null
-                )
-              }
+              onChange={(event) => handleFileSelection(input, event.target.files)}
               className="sr-only"
             />
             <button
               type="button"
               onClick={() => fileInputRefs.current[input.id]?.click()}
-              className="btn-cyber btn-secondary w-full text-sm"
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragOverInputId(input.id);
+              }}
+              onDragLeave={() => setDragOverInputId((current) => current === input.id ? null : current)}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragOverInputId(null);
+                handleFileSelection(input, event.dataTransfer.files);
+              }}
+              aria-describedby={errorMessage ? `${inputId}-error` : undefined}
+              className={`w-full rounded-xl border border-dashed px-4 py-4 text-left transition-colors ${
+                dragOverInputId === input.id
+                  ? 'border-cyber-cyan bg-cyber-cyan/10'
+                  : 'border-border bg-surface hover:border-cyber-cyan/35'
+              }`}
             >
-              <Upload size={15} />
-              {Array.isArray(formValues[input.id])
-                ? `${(formValues[input.id] as File[]).length} file(s) selected`
-                : formValues[input.id]
-                  ? (formValues[input.id] as File).name
-                  : input.multiple
-                    ? 'Choose files'
-                    : 'Choose file'}
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/10 p-2 text-cyber-cyan">
+                  <FileUp size={16} />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-foreground">
+                    {selectedFiles.length > 0
+                      ? input.multiple
+                        ? `${selectedFiles.length} file selected`
+                        : selectedFiles[0].name
+                      : input.multiple
+                        ? 'Drop files here or choose files'
+                        : 'Drop a file here or choose a file'}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Local analysis only. Files stay in this browser unless a tool explicitly says otherwise.
+                  </div>
+                </div>
+              </div>
             </button>
+            {selectedFiles.length > 0 && (
+              <div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted-foreground">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="truncate">
+                    {selectedFiles.slice(0, 2).map((file) => file.name).join(', ')}
+                    {selectedFiles.length > 2 ? ` +${selectedFiles.length - 2} more` : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => clearFileSelection(input.id)}
+                    className="text-cyber-cyan hover:text-foreground"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         );
       default:
@@ -223,6 +314,8 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
             placeholder={input.placeholder}
             autoComplete={input.type === 'password' ? 'new-password' : undefined}
             spellCheck={input.type === 'password' ? false : undefined}
+            aria-invalid={Boolean(errorMessage)}
+            aria-describedby={errorMessage ? `${inputId}-error` : undefined}
             className="input-cyber text-sm"
           />
         );
@@ -255,14 +348,24 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
               )}
               {renderInput(input)}
               {input.helperText && (
-                <p className="mt-1 text-[11px] text-muted-foreground">{input.helperText}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{input.helperText}</p>
+              )}
+              {submitAttempted && validationErrors[input.id] && (
+                <p id={`${tool.id}-${input.id}-error`} className="mt-1 text-xs text-cyber-red">
+                  {validationErrors[input.id]}
+                </p>
               )}
             </div>
           ))}
+          {submitAttempted && Object.keys(validationErrors).length > 0 && (
+            <div className="rounded-lg border border-status-warn/20 bg-status-warn/10 px-3 py-2 text-xs text-status-warn">
+              Complete the required fields before running this panel.
+            </div>
+          )}
           <button
             type="button"
             onClick={handleRun}
-            disabled={running}
+            disabled={!canRun}
             className="btn-cyber btn-primary btn-lg w-full disabled:cursor-not-allowed disabled:opacity-60"
           >
             {running ? (

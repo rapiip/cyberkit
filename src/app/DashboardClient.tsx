@@ -108,7 +108,7 @@ export default function Dashboard() {
   }, [loadFromStorage]);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-10 p-4 pt-20 md:p-8">
+    <div className="page-shell space-y-10">
       <motion.header {...fadeUp} transition={{ duration: 0.4 }} className="space-y-5 py-4 text-center">
         <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-cyber-cyan/20 bg-cyber-cyan/5 px-3 py-1 text-xs text-cyber-cyan">
           <Sparkles size={13} />
@@ -119,8 +119,7 @@ export default function Dashboard() {
             Start with the <span className="gradient-text">security outcome</span>
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
-            CyberKit combines related checks into focused workspaces. Utility tools remain available
-            inside each workflow without crowding the primary navigation.
+            Start from the outcome you need, then drop into the exact workspace or tool panel that fits the task.
           </p>
         </div>
 
@@ -131,8 +130,8 @@ export default function Dashboard() {
             onChange={(event) => setSearchQuery(event.target.value)}
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => window.setTimeout(() => setIsSearchFocused(false), 150)}
-            placeholder="Search workflows or capabilities"
-            aria-label="Search workflows or capabilities"
+            placeholder="Jump to a workflow, workspace, or tool"
+            aria-label="Jump to a workflow, workspace, or tool"
             className="input-cyber py-3 pl-11 pr-4 text-sm"
           />
           {showSearch && (
@@ -168,17 +167,17 @@ export default function Dashboard() {
         <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 id="goal-entry-points" className="text-xl font-semibold">What do you need to do?</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Seven common workflows, each with a clear starting point.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Primary entry points for the most common security jobs.</p>
           </div>
           <Link href="/workspaces" className="flex items-center gap-1 text-xs text-cyber-cyan">
-            Browse all workspaces <ArrowRight size={13} />
+            Browse workspace catalog <ArrowRight size={13} />
           </Link>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {goalEntries.map((goal) => {
             const Icon = goal.icon;
             return (
-              <article key={goal.title} className="glass-card flex min-h-52 flex-col p-5">
+              <article key={goal.title} className="glass-card interactive-card flex min-h-52 flex-col p-5">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyber-cyan/20 bg-cyber-cyan/10 text-cyber-cyan">
                   <Icon size={20} aria-hidden="true" />
                 </div>
@@ -202,15 +201,15 @@ export default function Dashboard() {
 
       <motion.section {...fadeUp} transition={{ duration: 0.4, delay: 0.14 }} aria-labelledby="priority-workspaces">
         <div className="mb-4">
-          <h2 id="priority-workspaces" className="text-xl font-semibold">Priority workspaces</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Core workflows surfaced for routine security work.</p>
+          <h2 id="priority-workspaces" className="text-xl font-semibold">Browse by workspace</h2>
+          <p className="mt-1 text-sm text-muted-foreground">If you already know the workflow family, jump straight into a workspace.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {priorityWorkspaces.map((workspace) => (
             <Link
               key={workspace.id}
               href={workspace.canonicalPath}
-              className="glass-card group flex items-center gap-3 p-4 transition-all hover:border-cyber-cyan/35"
+              className="glass-card interactive-card group flex items-center gap-3 p-4 transition-all hover:border-cyber-cyan/35"
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-cyber-cyan/10 text-cyber-cyan">
                 <WorkspaceIcon name={workspace.icon} size={18} />

@@ -64,7 +64,7 @@ export default function ToolClient({ tool, relatedTools, categoryName }: ToolCli
                 className="glass-card p-3"
               >
                 <h3 className="text-xs font-medium">{relatedTool.name}</h3>
-                <p className="mt-1 text-[11px] text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {relatedTool.shortDescription}
                 </p>
               </Link>

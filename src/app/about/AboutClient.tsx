@@ -7,7 +7,7 @@ import { categories } from '@/lib/tools/categories';
 import Link from 'next/link';
 
 const techStack = [
-  { name: 'Next.js 15', desc: 'React framework' },
+  { name: 'Next.js 16', desc: 'App Router framework' },
   { name: 'TypeScript', desc: 'Type safety' },
   { name: 'Tailwind CSS v4', desc: 'Styling' },
   { name: 'Framer Motion', desc: 'Animations' },
@@ -19,7 +19,7 @@ const techStack = [
 
 export default function AboutPage() {
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8">
+    <div className="page-shell-tight max-w-4xl space-y-8">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center py-8">
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold mx-auto mb-4" style={{ background: 'linear-gradient(135deg, #00f0ff, #00ff88)' }}>
           <span style={{ color: '#06080f' }}>CK</span>
@@ -35,10 +35,10 @@ export default function AboutPage() {
         {[
           { icon: <Wrench size={20} />, value: allToolMetadata.length, label: 'Tools' },
           { icon: <Shield size={20} />, value: categories.length, label: 'Categories' },
-          { icon: <FlaskConical size={20} />, value: 2, label: 'Labs' },
+          { icon: <FlaskConical size={20} />, value: 4, label: 'Labs' },
           { icon: <FileText size={20} />, value: '∞', label: 'Reports' },
         ].map((stat, i) => (
-          <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="glass-card p-4 text-center">
+            <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="glass-card p-4 text-center">
             <div className="text-cyber-cyan mx-auto mb-2 flex justify-center">{stat.icon}</div>
             <div className="text-2xl font-bold">{stat.value}</div>
             <div className="text-xs text-muted-foreground">{stat.label}</div>

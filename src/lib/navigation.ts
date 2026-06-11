@@ -6,15 +6,15 @@ export interface NavigationItem {
 
 export const primaryNavigation: NavigationItem[] = [
   { href: '/', label: 'Home', icon: 'home' },
+  { href: '/audit', label: 'Website Audit', icon: 'shield' },
   { href: '/workspaces', label: 'Workspaces', icon: 'grid' },
-  { href: '/workspaces/website-security-audit', label: 'Website Audit', icon: 'shield' },
-  { href: '/workspaces/domain-ip-intelligence', label: 'Domain / IP', icon: 'radar' },
-  { href: '/workspaces/file-triage-ioc', label: 'File Triage', icon: 'file' },
-  { href: '/workspaces/secret-scanner', label: 'Secret Scanner', icon: 'scanner' },
-  { href: '/workspaces/cve-kev-intelligence', label: 'CVE / KEV', icon: 'cve' },
 ];
 
 export const secondaryNavigation: NavigationItem[] = [
+  { href: '/tools', label: 'Tool Library', icon: 'file' },
+  { href: '/workspaces/domain-ip-intelligence', label: 'Domain / IP', icon: 'radar' },
+  { href: '/workspaces/secret-scanner', label: 'Secret Scanner', icon: 'scanner' },
+  { href: '/workspaces/cve-kev-intelligence', label: 'CVE / KEV', icon: 'cve' },
   { href: '/labs', label: 'Security Labs', icon: 'labs' },
   { href: '/reports', label: 'Reports', icon: 'report' },
   { href: '/history', label: 'History', icon: 'history' },

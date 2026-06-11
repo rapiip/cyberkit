@@ -47,6 +47,7 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const openButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileDialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -57,8 +58,28 @@ export default function Sidebar() {
         openButtonRef.current?.focus();
       }
     };
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusable = mobileDialogRef.current?.querySelectorAll<HTMLElement>(
+        'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
+    window.addEventListener('keydown', trapFocus);
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('keydown', trapFocus);
+    };
   }, [mobileOpen]);
 
   const isActive = (href: string) => {
@@ -103,7 +124,7 @@ export default function Sidebar() {
         {!isCollapsed && (
           <div className="min-w-0">
             <span className="block text-sm font-bold gradient-text">CyberKit</span>
-            <span className="block text-[10px] text-muted-foreground">Security Workspaces</span>
+            <span className="block text-xs text-muted-foreground">Task-first security workspace</span>
           </div>
         )}
       </div>
@@ -111,7 +132,7 @@ export default function Sidebar() {
       <nav aria-label="Primary navigation" className="flex-1 space-y-1 overflow-y-auto px-2 py-3 scrollbar-thin">
         {renderNavigation(primaryNavigation, isCollapsed)}
         <div className="my-3 border-t border-border" />
-        {!isCollapsed && <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Support</p>}
+        {!isCollapsed && <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick access</p>}
         {renderNavigation(secondaryNavigation, isCollapsed)}
       </nav>
 
@@ -133,7 +154,7 @@ export default function Sidebar() {
       <button
         ref={openButtonRef}
         type="button"
-        className="fixed left-3 top-3 z-50 rounded-lg border border-border bg-surface p-2 transition-all hover:border-cyber-cyan/35 md:hidden"
+        className="fixed left-3 top-3 z-50 rounded-lg border border-border bg-surface/95 p-2 transition-all hover:border-cyber-cyan/35 md:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="Open navigation menu"
         aria-expanded={mobileOpen}
@@ -151,6 +172,7 @@ export default function Sidebar() {
             onClick={() => setMobileOpen(false)}
           >
             <motion.aside
+              ref={mobileDialogRef}
               initial={{ x: -260 }}
               animate={{ x: 0 }}
               exit={{ x: -260 }}

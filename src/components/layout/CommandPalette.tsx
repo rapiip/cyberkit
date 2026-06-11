@@ -16,7 +16,7 @@ export default function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const results = useMemo(() => searchWorkspaceNavigation(query).slice(0, 10), [query]);
+  const results = useMemo(() => searchWorkspaceNavigation(query).slice(0, 8), [query]);
   const safeSelectedIndex = Math.min(selectedIndex, Math.max(results.length - 1, 0));
 
   const closePalette = useCallback(() => {
@@ -107,8 +107,8 @@ export default function CommandPalette() {
                   setSelectedIndex(0);
                 }}
                 onKeyDown={handleKeyDown}
-                placeholder="Search workflows or capabilities"
-                aria-label="Search workflows or capabilities"
+                placeholder="Jump to a workflow, workspace, or tool"
+                aria-label="Jump to a workflow, workspace, or tool"
                 aria-controls="command-palette-results"
                 aria-activedescendant={results[safeSelectedIndex] ? `command-result-${safeSelectedIndex}` : undefined}
                 className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
@@ -153,7 +153,7 @@ export default function CommandPalette() {
               )}
             </div>
 
-            <div className="flex flex-wrap gap-4 border-t border-border px-4 py-2 text-[10px] text-muted-foreground">
+            <div className="flex flex-wrap gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground">
               <span>Arrow keys: navigate</span>
               <span>Enter: open</span>
               <span>Esc: close</span>
@@ -175,7 +175,7 @@ export function CommandPaletteTrigger() {
     >
       <Search size={14} />
       <span>Search workflows</span>
-      <kbd className="flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px]">
+      <kbd className="flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-xs">
         <Command size={10} /> K
       </kbd>
     </button>

@@ -10,7 +10,7 @@ export default function WorkspaceError({
   unstable_retry: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-3xl p-4 pt-20 md:p-8">
+    <div className="page-shell-tight max-w-3xl">
       <StatePanel
         icon={<AlertTriangle size={24} />}
         title="Workspace could not be loaded"

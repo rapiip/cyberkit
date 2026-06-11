@@ -23,6 +23,8 @@ export default function SettingsPage() {
   const [syncPassphrase, setSyncPassphrase] = useState('');
   const [syncStatus, setSyncStatus] = useState('');
   const [syncAction, setSyncAction] = useState<'push' | 'pull' | null>(null);
+  const [importStatus, setImportStatus] = useState('');
+  const [dangerAction, setDangerAction] = useState<'history' | 'favorites' | 'reports' | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : localStorage.getItem(LAST_SYNCED_STORAGE_KEY)
   );
@@ -69,6 +71,7 @@ export default function SettingsPage() {
     } as const);
 
   const importData = () => {
+    setImportStatus('');
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
@@ -79,9 +82,12 @@ export default function SettingsPage() {
         const text = await file.text();
         const data = validateImportedCyberKitData(JSON.parse(text));
         importCyberKitData(data);
-        window.location.reload();
+        loadHistory();
+        loadFavorites();
+        loadReports();
+        setImportStatus(`Imported ${data.history.length} history entries, ${data.favorites.length} favorites, and ${data.reports.length} reports.`);
       } catch (error) {
-        alert(error instanceof Error ? error.message : 'Invalid file format');
+        setImportStatus(error instanceof Error ? error.message : 'Invalid file format');
       }
     };
     input.click();
@@ -133,9 +139,13 @@ export default function SettingsPage() {
         data.envelope as EncryptedSyncEnvelope,
         syncPassphrase
       );
-      importCyberKitData(validateImportedCyberKitData(decrypted));
+      const imported = validateImportedCyberKitData(decrypted);
+      importCyberKitData(imported);
+      loadHistory();
+      loadFavorites();
+      loadReports();
       rememberLastSyncedAt(new Date().toISOString());
-      window.location.reload();
+      setSyncStatus(`Cloud restore completed with ${imported.history.length} history entries, ${imported.favorites.length} favorites, and ${imported.reports.length} reports.`);
     } catch (error) {
       setSyncStatus(error instanceof Error ? error.message : 'Cloud restore failed');
     } finally {
@@ -144,7 +154,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
+    <div className="page-shell-tight max-w-3xl space-y-6">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Settings size={24} className="text-muted-foreground" /> Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">Manage your data and preferences.</p>
@@ -176,6 +186,7 @@ export default function SettingsPage() {
           <button onClick={exportData} className="btn-cyber btn-secondary flex-1"><Download size={14} /> Export All Data</button>
           <button onClick={importData} className="btn-cyber btn-secondary flex-1"><Upload size={14} /> Import Data</button>
         </div>
+        {importStatus && <p className="text-sm text-muted-foreground">{importStatus}</p>}
       </div>
 
       {/* Cloud Sync */}
@@ -248,15 +259,41 @@ export default function SettingsPage() {
       <div className="glass-card p-5 space-y-4 border-cyber-red/20">
         <h2 className="font-semibold text-sm text-cyber-red">Danger Zone</h2>
         <div className="space-y-3">
-          <button onClick={() => { clearHistory(); }} className="btn-cyber btn-danger w-full text-sm">
-            <Trash2 size={14} /> Clear Scan History ({historyEntries.length} entries)
+          <button onClick={() => {
+            if (dangerAction === 'history') {
+              clearHistory();
+              setDangerAction(null);
+              return;
+            }
+            setDangerAction('history');
+          }} className="btn-cyber btn-danger w-full text-sm">
+            <Trash2 size={14} /> {dangerAction === 'history' ? 'Confirm clear history' : `Clear Scan History (${historyEntries.length} entries)`}
           </button>
-          <button onClick={() => { favoriteTools.forEach((favorite) => toggleFavorite(favorite)); }} className="btn-cyber btn-danger w-full text-sm">
-            <Trash2 size={14} /> Clear Favorites ({favoriteTools.length} items)
+          <button onClick={() => {
+            if (dangerAction === 'favorites') {
+              favoriteTools.forEach((favorite) => toggleFavorite(favorite));
+              setDangerAction(null);
+              return;
+            }
+            setDangerAction('favorites');
+          }} className="btn-cyber btn-danger w-full text-sm">
+            <Trash2 size={14} /> {dangerAction === 'favorites' ? 'Confirm clear favorites' : `Clear Favorites (${favoriteTools.length} items)`}
           </button>
-          <button onClick={() => { clearReports(); }} className="btn-cyber btn-danger w-full text-sm">
-            <Trash2 size={14} /> Clear All Reports ({savedReports.length} reports)
+          <button onClick={() => {
+            if (dangerAction === 'reports') {
+              clearReports();
+              setDangerAction(null);
+              return;
+            }
+            setDangerAction('reports');
+          }} className="btn-cyber btn-danger w-full text-sm">
+            <Trash2 size={14} /> {dangerAction === 'reports' ? 'Confirm clear reports' : `Clear All Reports (${savedReports.length} reports)`}
           </button>
+          {dangerAction && (
+            <button onClick={() => setDangerAction(null)} className="btn-cyber btn-ghost w-full text-sm">
+              Cancel destructive action
+            </button>
+          )}
         </div>
       </div>
 
