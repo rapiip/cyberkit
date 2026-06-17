@@ -21,7 +21,7 @@
   "dependencies": {
     "@types/react-syntax-highlighter": "^15.5.13",
     "@zxcvbn-ts/core": "^3.0.4",
-    "@zxcvbn-ts/language-common": "^3.0.4",
+    "@zxcvbn-ts/language-common": "^4.1.2",
     "@zxcvbn-ts/language-en": "^3.0.2",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
