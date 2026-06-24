@@ -18,6 +18,8 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
+    env:
+      DEPENDABOT_MERGE_METHOD: SQUASH
 
     steps:
       - name: Resolve Dependabot PR number
@@ -64,6 +66,10 @@ jobs:
         with:
           script: |
             const prNumber = Number("${{ steps.pr.outputs.number }}");
+            const mergeMethod = process.env.DEPENDABOT_MERGE_METHOD || "SQUASH";
+            if (!["MERGE", "SQUASH", "REBASE"].includes(mergeMethod)) {
+              throw new Error(`Unsupported merge method: ${mergeMethod}`);
+            }
             const { data: pr } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -72,8 +78,8 @@ jobs:
 
             await github.graphql(
               `
-                mutation($pullRequestId: ID!) {
-                  enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: SQUASH }) {
+                mutation($pullRequestId: ID!, $mergeMethod: PullRequestMergeMethod!) {
+                  enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: $mergeMethod }) {
                     pullRequest {
                       number
                       autoMergeRequest {
@@ -83,5 +89,5 @@ jobs:
                   }
                 }
               `,
-              { pullRequestId: pr.node_id },
+              { pullRequestId: pr.node_id, mergeMethod },
             );
