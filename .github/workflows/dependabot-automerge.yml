@@ -25,7 +25,7 @@ jobs:
     steps:
       - name: Resolve Dependabot PR number
         id: pr
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const prs = context.payload.workflow_run.pull_requests || [];
@@ -53,7 +53,7 @@ jobs:
       - name: Fetch Dependabot metadata
         if: steps.pr.outputs.number != ''
         id: metadata
-        uses: dependabot/fetch-metadata@v2
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ steps.pr.outputs.number }}
@@ -63,7 +63,7 @@ jobs:
           steps.pr.outputs.number != '' &&
           (steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
           steps.metadata.outputs.update-type == 'version-update:semver-patch')
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const prNumber = parseInt("${{ steps.pr.outputs.number }}", 10);
