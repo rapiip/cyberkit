@@ -2,7 +2,7 @@ name: Dependabot Auto Merge
 
 on:
   workflow_run:
-    # Must match the CI workflow name in .github/workflows/ci.yml.
+    # Must match the CI workflow name ("CI") in .github/workflows/ci.yml.
     workflows:
       - CI
     types:
@@ -19,6 +19,7 @@ jobs:
       github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
     env:
+      # Keep SQUASH by default; valid options: MERGE, SQUASH, REBASE.
       DEPENDABOT_MERGE_METHOD: SQUASH
 
     steps:
@@ -65,7 +66,7 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const prNumber = Number("${{ steps.pr.outputs.number }}");
+            const prNumber = parseInt("${{ steps.pr.outputs.number }}", 10);
             const mergeMethod = process.env.DEPENDABOT_MERGE_METHOD || "SQUASH";
             if (!["MERGE", "SQUASH", "REBASE"].includes(mergeMethod)) {
               throw new Error(`Unsupported merge method: ${mergeMethod}`);
