@@ -1,0 +1,86 @@
+name: Dependabot Auto Merge
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve Dependabot PR number
+        id: pr
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prs = context.payload.workflow_run.pull_requests || [];
+            if (prs.length === 0) {
+              core.setOutput("number", "");
+              return;
+            }
+
+            const prNumber = prs[0].number;
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            const isDependabot = pr.user?.login === "dependabot[bot]";
+            const isOpen = pr.state === "open";
+            if (!isDependabot || !isOpen) {
+              core.setOutput("number", "");
+              return;
+            }
+
+            core.setOutput("number", String(prNumber));
+
+      - name: Fetch Dependabot metadata
+        if: steps.pr.outputs.number != ''
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ steps.pr.outputs.number }}
+
+      - name: Enable auto-merge for minor and patch updates
+        if: >-
+          steps.pr.outputs.number != '' &&
+          (steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-patch')
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = Number("${{ steps.pr.outputs.number }}");
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            await github.graphql(
+              `
+                mutation($pullRequestId: ID!) {
+                  enablePullRequestAutoMerge(input: { pullRequestId: $pullRequestId, mergeMethod: SQUASH }) {
+                    pullRequest {
+                      number
+                      autoMergeRequest {
+                        enabledAt
+                      }
+                    }
+                  }
+                }
+              `,
+              { pullRequestId: pr.node_id },
+            );

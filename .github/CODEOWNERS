@@ -1,0 +1,5 @@
+* @rapiip
+/package.json @rapiip
+/package-lock.json @rapiip
+/.github/dependabot.yml @rapiip
+/.github/workflows/* @rapiip
