@@ -2,6 +2,7 @@ name: Dependabot Auto Merge
 
 on:
   workflow_run:
+    # Must match the CI workflow name in .github/workflows/ci.yml.
     workflows:
       - CI
     types:
