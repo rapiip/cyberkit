@@ -14,13 +14,54 @@ export default function ReportsPage() {
   const [selectedReport, setSelectedReport] = useState<SavedReport | null>(null);
   const [targetFilter, setTargetFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [confirmClear, setConfirmClear] = useState(false);
   const closePreviewRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
   useEffect(() => {
     if (!selectedReport) return;
     window.setTimeout(() => closePreviewRef.current?.focus(), 0);
   }, [selectedReport]);
+
+  // Focus trap + Escape for the preview modal
+  useEffect(() => {
+    if (!selectedReport) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedReport(null);
+    };
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    window.addEventListener('keydown', trapFocus);
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('keydown', trapFocus);
+    };
+  }, [selectedReport]);
+
+  const handleClear = () => {
+    if (confirmClear) {
+      clearReports();
+      setConfirmClear(false);
+      return;
+    }
+    setConfirmClear(true);
+  };
 
   const filteredReports = useMemo(() => {
     return reports.filter((report) => {
@@ -52,13 +93,17 @@ export default function ReportsPage() {
     <div className="page-shell-tight space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold"><FileText size={24} className="text-muted-foreground" /> Saved Reports</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-bold"><FileText size={24} className="text-cyber-cyan" /> Saved Reports</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Review locally saved outputs, export clean artifacts, and reopen findings without rerunning a workflow.
           </p>
         </div>
         {reports.length > 0 && (
-          <button onClick={clearReports} className="btn-cyber btn-danger btn-sm"><Trash2 size={12} /> Clear All</button>
+          <div aria-live="polite">
+            <button onClick={handleClear} className="btn-cyber btn-danger btn-sm">
+              <Trash2 size={12} /> {confirmClear ? 'Confirm clear all?' : 'Clear All'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -71,6 +116,7 @@ export default function ReportsPage() {
               onChange={(event) => setTargetFilter(event.target.value)}
               placeholder="Filter by target or report title..."
               className="input-cyber pl-9 py-2 text-sm"
+              aria-label="Filter reports by target or title"
             />
           </div>
           <input
@@ -78,6 +124,7 @@ export default function ReportsPage() {
             value={dateFilter}
             onChange={(event) => setDateFilter(event.target.value)}
             className="input-cyber py-2 text-sm sm:w-44"
+            aria-label="Filter by date"
           />
         </div>
       )}
@@ -107,7 +154,7 @@ export default function ReportsPage() {
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Clock size={10} />
                 <span>{new Date(report.createdAt).toLocaleString()}</span>
-                <span className="badge badge-cyan text-[9px]">{report.format}</span>
+                <span className="badge badge-cyan text-xs">{report.format}</span>
                 <span>{report.toolsUsed.length} tool(s) used</span>
               </div>
               <pre className="mt-3 max-h-32 overflow-auto rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] p-3 font-mono text-xs text-muted-foreground">
@@ -128,7 +175,7 @@ export default function ReportsPage() {
 
       {selectedReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#050709]/80 p-4 backdrop-blur-md" onClick={() => setSelectedReport(null)}>
-          <div role="dialog" aria-modal="true" aria-labelledby="report-preview-title" className="glass-card flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden border border-[color:var(--accent-border)] shadow-[0_30px_80px_rgba(0,0,0,0.45)]" onClick={(event) => event.stopPropagation()}>
+          <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="report-preview-title" className="glass-card flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden border border-[color:var(--accent-border)] shadow-[0_30px_80px_rgba(0,0,0,0.45)]" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
               <div>
                 <h2 id="report-preview-title" className="font-semibold text-sm">{selectedReport.title}</h2>

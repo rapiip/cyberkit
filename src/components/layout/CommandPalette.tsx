@@ -82,8 +82,8 @@ export default function CommandPalette() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-start justify-center bg-[#050709]/80 px-3 pt-[12vh] backdrop-blur-md"
-          onClick={closePalette}
+              className="fixed inset-0 z-50 flex items-start justify-center bg-[#050709]/80 px-3 pt-[8vh] backdrop-blur-md lg:pt-[12vh]"
+              onClick={closePalette}
         >
           <motion.div
             ref={dialogRef}
@@ -155,10 +155,10 @@ export default function CommandPalette() {
               )}
             </div>
 
-            <div className="flex flex-wrap gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground">
-              <span>Arrow keys: navigate</span>
-              <span>Enter: open</span>
-              <span>Esc: close</span>
+            <div className="flex flex-wrap gap-4 border-t border-border bg-[color:var(--panel-subtle)] px-4 py-2 text-xs text-muted-foreground">
+              <span>↑↓ navigate</span>
+              <span>↵ open</span>
+              <span>esc close</span>
             </div>
           </motion.div>
         </motion.div>
@@ -172,12 +172,12 @@ export function CommandPaletteTrigger() {
     <button
       type="button"
       onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
-      className="hidden items-center gap-2 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground transition-all hover:border-[color:var(--accent-border)] hover:bg-surface-hover sm:flex"
+      className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground transition-all hover:border-[color:var(--accent-border)] hover:bg-surface-hover hover:text-foreground"
       aria-label="Open command palette"
     >
       <Search size={14} />
-      <span>Search workflows</span>
-      <kbd className="flex items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-xs">
+      <span className="hidden sm:inline">Search workflows</span>
+      <kbd className="hidden items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 text-xs sm:flex">
         <Command size={10} /> K
       </kbd>
     </button>

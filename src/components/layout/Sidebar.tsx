@@ -154,7 +154,7 @@ export default function Sidebar() {
       <button
         ref={openButtonRef}
         type="button"
-        className="fixed left-3 top-3 z-50 rounded-xl border border-border bg-surface/95 p-2.5 transition-all hover:border-cyber-cyan/25 md:hidden"
+        className="fixed left-3 top-3 z-50 rounded-xl border border-border bg-surface/95 p-2.5 text-cyber-cyan shadow-[0_8px_24px_rgba(0,0,0,0.28)] backdrop-blur-md transition-all hover:border-cyber-cyan/25 hover:text-foreground md:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="Open navigation menu"
         aria-expanded={mobileOpen}
@@ -179,7 +179,7 @@ export default function Sidebar() {
               role="dialog"
               aria-modal="true"
               aria-label="Mobile navigation"
-              className="h-full w-72 border-r border-border bg-[#171c21]"
+              className="h-full w-[260px] max-w-[85vw] border-r border-border bg-surface"
               onClick={(event) => event.stopPropagation()}
             >
               <button

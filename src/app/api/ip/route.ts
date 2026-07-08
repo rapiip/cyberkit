@@ -15,6 +15,7 @@ import {
   resolveAndBlockPrivateIp,
   TIMEOUTS,
 } from '@/lib/server/scanner';
+import { logger } from '@/lib/server/logger';
 
 interface IpApiResponse {
   status: 'success' | 'fail';
@@ -48,7 +49,10 @@ async function getThreatIntel(ip: string, hostname: string) {
     providers.abuseIpDb = await optionalJson(
       `https://api.abuseipdb.com/api/v2/check?ipAddress=${encodeURIComponent(ip)}&maxAgeInDays=90`,
       { headers: { Accept: 'application/json', Key: abuseKey } }
-    ).catch((error: unknown) => ({ error: error instanceof Error ? error.message : 'AbuseIPDB lookup failed' }));
+    ).catch((error: unknown) => {
+      logger.warn('AbuseIPDB lookup failed', { provider: 'abuseipdb', errorCategory: 'PROVIDER_ERROR' }, error);
+      return { error: error instanceof Error ? error.message : 'AbuseIPDB lookup failed' };
+    });
   }
 
   const shodanKey = process.env.SHODAN_API_KEY;
@@ -57,7 +61,10 @@ async function getThreatIntel(ip: string, hostname: string) {
     providers.shodan = await optionalJson(
       `https://api.shodan.io/shodan/host/${encodeURIComponent(ip)}?key=${encodeURIComponent(shodanKey)}`,
       { headers: { Accept: 'application/json' } }
-    ).catch((error: unknown) => ({ error: error instanceof Error ? error.message : 'Shodan lookup failed' }));
+    ).catch((error: unknown) => {
+      logger.warn('Shodan lookup failed', { provider: 'shodan', errorCategory: 'PROVIDER_ERROR' }, error);
+      return { error: error instanceof Error ? error.message : 'Shodan lookup failed' };
+    });
   }
 
   const vtKey = process.env.VIRUSTOTAL_API_KEY;
@@ -68,7 +75,10 @@ async function getThreatIntel(ip: string, hostname: string) {
     providers.virusTotal = await optionalJson(
       `https://www.virustotal.com/api/v3/${vtType}/${encodeURIComponent(vtId)}`,
       { headers: { Accept: 'application/json', ...envHeader('VIRUSTOTAL_API_KEY', 'x-apikey') } }
-    ).catch((error: unknown) => ({ error: error instanceof Error ? error.message : 'VirusTotal lookup failed' }));
+    ).catch((error: unknown) => {
+      logger.warn('VirusTotal lookup failed', { provider: 'virustotal', errorCategory: 'PROVIDER_ERROR' }, error);
+      return { error: error instanceof Error ? error.message : 'VirusTotal lookup failed' };
+    });
   }
 
   const urlhausKey = process.env.URLHAUS_AUTH_KEY;
@@ -85,7 +95,10 @@ async function getThreatIntel(ip: string, hostname: string) {
         },
         body: new URLSearchParams({ host: hostname }),
       }
-    ).catch((error: unknown) => ({ error: error instanceof Error ? error.message : 'URLhaus lookup failed' }));
+    ).catch((error: unknown) => {
+      logger.warn('URLhaus lookup failed', { provider: 'urlhaus', errorCategory: 'PROVIDER_ERROR' }, error);
+      return { error: error instanceof Error ? error.message : 'URLhaus lookup failed' };
+    });
   }
 
   return { configuredProviders, providers };

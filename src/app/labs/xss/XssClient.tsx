@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FlaskConical, AlertTriangle, Play, Shield, Code, ChevronRight, CheckCircle, Terminal } from 'lucide-react';
 import Link from 'next/link';
@@ -38,6 +38,39 @@ export default function XSSLab() {
   const [activeChallenge, setActiveChallenge] = useState(0);
   const [showSecure, setShowSecure] = useState(false);
   const [showMockAlert, setShowMockAlert] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap for mock alert dialog
+  const handleDialogKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setShowMockAlert(false);
+      return;
+    }
+    if (e.key === 'Tab' && dialogRef.current) {
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showMockAlert && dialogRef.current) {
+      const focusable = dialogRef.current.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      focusable?.focus();
+    }
+  }, [showMockAlert]);
 
   const handleSubmit = () => {
     const payload = input.trim();
@@ -124,8 +157,8 @@ export default function XSSLab() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <FlaskConical className="text-cyber-amber" /> 
+        <h1 className="text-2xl font-bold flex items-center gap-3">
+          <FlaskConical className="text-cyber-amber" size={24} />
           Cross-Site Scripting (XSS) Lab
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -133,10 +166,10 @@ export default function XSSLab() {
         </p>
       </motion.div>
 
-      <div className="rounded-xl border border-status-warn/20 bg-[color:var(--panel-subtle)] p-4 flex items-start gap-3 text-xs">
+      <div className="glass-card p-4 flex items-start gap-3 text-xs" role="alert">
         <AlertTriangle size={16} className="text-cyber-amber shrink-0 mt-0.5" />
         <span className="text-muted-foreground">
-          <strong className="text-cyber-amber">Safe Sandbox.</strong> No scripts are actually executed against your machine. Celah XSS dianalisis secara sandboxed.
+          <strong className="text-cyber-amber">Safe Sandbox.</strong> No scripts are actually executed against your machine. XSS payloads are analyzed in a sandboxed environment.
         </span>
       </div>
 
@@ -160,7 +193,7 @@ export default function XSSLab() {
                 }`}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
                     activeChallenge === i ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-cyber-amber' : 'bg-muted text-muted-foreground'
                   }`}>
                     Level {c.level}
@@ -175,15 +208,16 @@ export default function XSSLab() {
 
         {/* Right Side: Interactive vulnerable form */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="bg-surface border border-border rounded-xl p-6">
+          <div className="glass-card p-6">
             <h2 className="text-sm font-semibold mb-5 flex items-center gap-2 text-foreground">
               <Code size={16} className="text-cyber-amber" /> Vulnerable Input Field
             </h2>
             
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">HTML Training Input</label>
+                <label htmlFor="xss-input" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">HTML Training Input</label>
                 <textarea 
+                  id="xss-input"
                   value={input} 
                   onChange={e => setInput(e.target.value)} 
                   placeholder="Paste sandbox training markup..." 
@@ -224,14 +258,14 @@ export default function XSSLab() {
                   {/* Escaped vs Unescaped output comparisons */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                     <div>
-                      <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-2 block">Vulnerable Output (Renders raw html)</span>
+                      <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2 block">Vulnerable Output (Renders raw html)</span>
                       <pre className="p-3 bg-status-fail/10 border border-status-fail/20 text-status-fail text-xs font-mono rounded-lg overflow-x-auto min-h-[60px]">
                         {result.output}
                       </pre>
                     </div>
 
                     <div>
-                      <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider mb-2 block">Secured Output (HTML Encoded)</span>
+                      <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider mb-2 block">Secured Output (HTML Encoded)</span>
                       <pre className="p-3 bg-status-pass/10 border border-status-pass/20 text-status-pass text-xs font-mono rounded-lg overflow-x-auto min-h-[60px]">
                         {result.escapedOutput}
                       </pre>
@@ -243,7 +277,7 @@ export default function XSSLab() {
           </div>
 
           {/* Secure fix comparison info */}
-          <div className="bg-surface border border-border rounded-xl p-6">
+          <div className="glass-card p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
                 <Shield size={16} className="text-status-pass" /> Secure Fix Comparison
@@ -300,8 +334,13 @@ function escapeHtml(str) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-background/75 backdrop-blur-sm flex items-center justify-center p-4"
+            aria-modal="true"
+            role="dialog"
+            aria-label="Simulated XSS alert dialog"
           >
             <motion.div 
+              ref={dialogRef}
+              onKeyDown={handleDialogKeyDown}
               initial={{ scale: 0.95, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 20 }}
@@ -318,6 +357,7 @@ function escapeHtml(str) {
                 <button
                   onClick={() => setShowMockAlert(false)}
                   className="btn-cyber btn-secondary btn-sm text-cyber-amber font-mono"
+                  autoFocus
                 >
                   OK
                 </button>

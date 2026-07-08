@@ -79,15 +79,16 @@ export default function AuthBypassLab() {
       {activeTab === 'interactive' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left panel: Login Form */}
-          <div className="lg:col-span-5 bg-surface border border-border rounded-xl p-6 space-y-6">
+          <div className="lg:col-span-5 glass-card p-6 space-y-6">
             <h2 className="text-md font-semibold text-foreground flex items-center gap-2">
               <Shield size={18} className="text-cyber-cyan" /> Admin Portal
             </h2>
 
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Username</label>
+                <label htmlFor="authbypass-username" className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Username</label>
                 <input
+                  id="authbypass-username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g., training username"
@@ -96,14 +97,16 @@ export default function AuthBypassLab() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Password</label>
+                <label htmlFor="authbypass-password" className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Password</label>
                 <input
+                  id="authbypass-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter password..."
                   className="input-cyber px-4 py-2.5 text-sm font-mono"
                   disabled={username.includes("'--")}
+                  aria-disabled={username.includes("'--")}
                 />
               </div>
 
@@ -120,7 +123,7 @@ export default function AuthBypassLab() {
               <span className="text-xs font-semibold text-cyber-cyan flex items-center gap-1.5">
                 💡 Target Challenge Payload
               </span>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 This local simulator shows why string-concatenated queries are unsafe. Observe how the generated SQL changes, then review the prepared-statement fix below.
               </p>
             </div>

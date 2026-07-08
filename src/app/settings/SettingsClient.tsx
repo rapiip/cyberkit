@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Trash2, Download, Upload, Info, Cloud, CloudDownload, CloudUpload } from 'lucide-react';
+import { Settings, Trash2, Download, Upload, Info, Cloud, CloudDownload, CloudUpload, Eye, EyeOff } from 'lucide-react';
 import {
   importCyberKitData,
   useHistoryStore,
@@ -21,6 +21,7 @@ const LAST_SYNCED_STORAGE_KEY = 'cyberkit:lastSyncedAt';
 export default function SettingsPage() {
   const [syncId, setSyncId] = useState('');
   const [syncPassphrase, setSyncPassphrase] = useState('');
+  const [showPassphrase, setShowPassphrase] = useState(false);
   const [syncStatus, setSyncStatus] = useState('');
   const [syncAction, setSyncAction] = useState<'push' | 'pull' | null>(null);
   const [importStatus, setImportStatus] = useState('');
@@ -156,7 +157,7 @@ export default function SettingsPage() {
   return (
     <div className="page-shell-tight max-w-3xl space-y-6">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold flex items-center gap-2"><Settings size={24} className="text-muted-foreground" /> Settings</h1>
+        <h1 className="text-2xl font-bold flex items-center gap-2"><Settings size={24} className="text-cyber-cyan" /> Settings</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Manage local data, encrypted sync behavior, and destructive actions from one quieter control surface.
         </p>
@@ -164,7 +165,7 @@ export default function SettingsPage() {
 
       <div className="glass-card p-5 space-y-4">
         <h2 className="font-semibold text-sm flex items-center gap-2"><Info size={14} /> Data Summary</h2>
-        <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
           <div className="rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] p-3">
             <div className="text-lg font-bold">{historyEntries.length}</div>
             <div className="text-xs text-muted-foreground">History Entries</div>
@@ -205,17 +206,28 @@ export default function SettingsPage() {
           autoComplete="off"
         />
         <label className="block text-xs text-muted-foreground" htmlFor="cloud-sync-passphrase">Encryption passphrase</label>
-        <input
-          id="cloud-sync-passphrase"
-          value={syncPassphrase}
-          onChange={(event) => setSyncPassphrase(event.target.value)}
-          className="input-cyber text-sm"
-          type="password"
-          placeholder="At least 16 characters"
-          minLength={16}
-          maxLength={256}
-          autoComplete="new-password"
-        />
+        <div className="relative">
+          <input
+            id="cloud-sync-passphrase"
+            value={syncPassphrase}
+            onChange={(event) => setSyncPassphrase(event.target.value)}
+            className="input-cyber pr-11 text-sm"
+            type={showPassphrase ? 'text' : 'password'}
+            placeholder="At least 16 characters"
+            minLength={16}
+            maxLength={256}
+            autoComplete="new-password"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassphrase((value) => !value)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label={showPassphrase ? 'Hide passphrase' : 'Show passphrase'}
+            aria-pressed={showPassphrase}
+          >
+            {showPassphrase ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
         <div className="rounded-xl border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] p-3 text-xs leading-5 text-muted-foreground">
           Your browser encrypts exports with AES-256-GCM. The key is derived locally with
           PBKDF2-SHA-256 and a random salt. The server receives only the Sync ID plus

@@ -97,6 +97,9 @@ export default function TransformationPipeline({ workspaceId }: TransformationPi
   const [outputEncoding, setOutputEncoding] = useState<TransformEncoding>('utf8');
   const [result, setResult] = useState<{ output: string; history: Array<{ step: TransformStep; output: string }> } | null>(null);
   const [error, setError] = useState('');
+  const [running, setRunning] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [recipeName, setRecipeName] = useState('');
 
   const operations = useMemo(() => {
     const allowed = workspaceId === 'data-transformation' ? dataTransformationOperations : ctfOperations;
@@ -118,20 +121,24 @@ export default function TransformationPipeline({ workspaceId }: TransformationPi
 
   const runPipeline = () => {
     setError('');
+    setRunning(true);
     try {
       setResult(executeTransformPipelineWithEncodings(input, steps, inputEncoding, outputEncoding));
     } catch (pipelineError) {
       setResult(null);
       setError(pipelineError instanceof Error ? pipelineError.message : 'Pipeline execution failed.');
+    } finally {
+      setRunning(false);
     }
   };
 
   const saveRecipe = () => {
-    const name = window.prompt('Recipe name');
-    if (!name) return;
-    const nextRecipes = [...recipes, { id: crypto.randomUUID(), name, steps }];
+    if (!recipeName.trim()) return;
+    const nextRecipes = [...recipes, { id: crypto.randomUUID(), name: recipeName.trim(), steps }];
     setRecipes(nextRecipes);
     localStorage.setItem(`${STORAGE_PREFIX}${workspaceId}`, JSON.stringify(nextRecipes));
+    setRecipeName('');
+    setSaveOpen(false);
   };
 
   return (
@@ -146,10 +153,19 @@ export default function TransformationPipeline({ workspaceId }: TransformationPi
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={runPipeline} className="btn-cyber btn-primary btn-sm">
-            <WandSparkles size={14} /> Run pipeline
+          <button type="button" onClick={runPipeline} className="btn-cyber btn-primary btn-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled={running || !steps.length} aria-busy={running}>
+            {running ? (
+              <>
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Running...
+              </>
+            ) : (
+              <>
+                <WandSparkles size={14} /> Run pipeline
+              </>
+            )}
           </button>
-          <button type="button" onClick={saveRecipe} className="btn-cyber btn-ghost btn-sm" disabled={!steps.length}>
+          <button type="button" onClick={() => setSaveOpen((value) => !value)} className="btn-cyber btn-ghost btn-sm" disabled={!steps.length} aria-expanded={saveOpen}>
             <Save size={14} /> Save recipe
           </button>
           <button
@@ -166,13 +182,36 @@ export default function TransformationPipeline({ workspaceId }: TransformationPi
             <RotateCcw size={14} /> Undo
           </button>
         </div>
+        {saveOpen && (
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center" role="group" aria-label="Save recipe">
+            <input
+              type="text"
+              value={recipeName}
+              onChange={(event) => setRecipeName(event.target.value)}
+              placeholder="Recipe name"
+              className="input-cyber text-sm sm:max-w-xs"
+              aria-label="Recipe name"
+              onKeyDown={(event) => event.key === 'Enter' && saveRecipe()}
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button type="button" onClick={saveRecipe} className="btn-cyber btn-primary btn-sm" disabled={!recipeName.trim()}>
+                Save
+              </button>
+              <button type="button" onClick={() => { setSaveOpen(false); setRecipeName(''); }} className="btn-cyber btn-ghost btn-sm">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-xs text-muted-foreground">Input</label>
+            <label htmlFor="pipeline-input" className="mb-1.5 block text-xs text-muted-foreground">Input</label>
             <textarea
+              id="pipeline-input"
               value={input}
               onChange={(event) => setInput(event.target.value)}
               rows={6}
@@ -269,9 +308,11 @@ export default function TransformationPipeline({ workspaceId }: TransformationPi
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium">{index + 1}. {step.operationId}</p>
-                      <label className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                      <label htmlFor={`step-enabled-${step.id}`} className="mt-1 flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
                         <input
+                          id={`step-enabled-${step.id}`}
                           type="checkbox"
+                          className="h-4 w-4 rounded border-border accent-cyber-cyan"
                           checked={step.enabled}
                           onChange={(event) =>
                             pushHistory(steps.map((candidate) =>
@@ -320,8 +361,9 @@ export default function TransformationPipeline({ workspaceId }: TransformationPi
 
                   {(step.operationId === 'caesar-encrypt' || step.operationId === 'caesar-decrypt') && (
                     <div className="mt-3">
-                      <label className="mb-1.5 block text-xs text-muted-foreground">Shift</label>
+                      <label htmlFor={`caesar-shift-${step.id}`} className="mb-1.5 block text-xs text-muted-foreground">Shift</label>
                       <input
+                        id={`caesar-shift-${step.id}`}
                         type="number"
                         className="input-cyber text-sm"
                         value={step.options?.shift ?? 3}
@@ -339,8 +381,9 @@ export default function TransformationPipeline({ workspaceId }: TransformationPi
                   {(step.operationId === 'xor-text' || step.operationId === 'xor-hex') && (
                     <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                       <div>
-                        <label className="mb-1.5 block text-xs text-muted-foreground">XOR key</label>
+                        <label htmlFor={`xor-key-${step.id}`} className="mb-1.5 block text-xs text-muted-foreground">XOR key</label>
                         <input
+                          id={`xor-key-${step.id}`}
                           type="text"
                           className="input-cyber text-sm"
                           value={step.options?.xorKey ?? '0x41'}

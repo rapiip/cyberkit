@@ -74,11 +74,13 @@ export default function HashWorkbenchPanel() {
       )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <div className="rounded-lg border border-border bg-surface p-4">
+        <div className="glass-card p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
             <Fingerprint size={16} /> Text Hash + Expected Verification
           </div>
+          <label htmlFor="hash-text-input" className="mb-1.5 block text-xs text-muted-foreground">Text to hash</label>
           <textarea
+            id="hash-text-input"
             value={textInput}
             onChange={(event) => setTextInput(event.target.value)}
             rows={5}
@@ -86,28 +88,36 @@ export default function HashWorkbenchPanel() {
             placeholder="Enter text to hash..."
           />
           <div className="mt-3 grid grid-cols-1 gap-3">
-            <select
-              value={algorithm}
-              onChange={(event) => setAlgorithm(event.target.value as HashAlgorithm)}
-              className="input-cyber text-sm"
-            >
-              {hashAlgorithms.map((candidate) => (
-                <option key={candidate} value={candidate}>{candidate}</option>
-              ))}
-            </select>
-            <input
-              value={expectedHash}
-              onChange={(event) => setExpectedHash(event.target.value)}
-              className="input-cyber text-sm"
-              placeholder="Optional expected hash"
-            />
+            <div>
+              <label htmlFor="hash-algorithm" className="mb-1.5 block text-xs text-muted-foreground">Algorithm</label>
+              <select
+                id="hash-algorithm"
+                value={algorithm}
+                onChange={(event) => setAlgorithm(event.target.value as HashAlgorithm)}
+                className="input-cyber text-sm"
+              >
+                {hashAlgorithms.map((candidate) => (
+                  <option key={candidate} value={candidate}>{candidate}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="hash-expected" className="mb-1.5 block text-xs text-muted-foreground">Expected hash (optional)</label>
+              <input
+                id="hash-expected"
+                value={expectedHash}
+                onChange={(event) => setExpectedHash(event.target.value)}
+                className="input-cyber text-sm"
+                placeholder="Optional expected hash"
+              />
+            </div>
             <button type="button" onClick={runTextHash} className="btn-cyber btn-primary btn-sm">
               Run text hash
             </button>
           </div>
           {textResult ? (
             <div className="mt-3 space-y-2 text-xs">
-              <pre className="overflow-auto whitespace-pre-wrap rounded-lg bg-background p-3 font-mono">{textResult.hash}</pre>
+              <pre className="overflow-auto whitespace-pre-wrap rounded-lg bg-background p-3 font-mono" title={textResult.hash}>{textResult.hash}</pre>
               {expectedHash.trim() && (
                 <p className={textResult.expected ? 'text-status-pass' : 'text-status-fail'}>
                   {textResult.expected ? 'Expected hash matched.' : 'Expected hash did not match.'}
@@ -117,20 +127,24 @@ export default function HashWorkbenchPanel() {
           ) : null}
         </div>
 
-        <div className="rounded-lg border border-border bg-surface p-4">
+        <div className="glass-card p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
             <CheckCheck size={16} /> Checksum Comparison
           </div>
+          <label htmlFor="hash-compare-left" className="mb-1.5 block text-xs text-muted-foreground">First hash value</label>
           <input
+            id="hash-compare-left"
             value={compareLeft}
             onChange={(event) => setCompareLeft(event.target.value)}
             className="input-cyber text-sm"
             placeholder="First hash value"
           />
+          <label htmlFor="hash-compare-right" className="mt-3 mb-1.5 block text-xs text-muted-foreground">Second hash value</label>
           <input
+            id="hash-compare-right"
             value={compareRight}
             onChange={(event) => setCompareRight(event.target.value)}
-            className="input-cyber mt-3 text-sm"
+            className="input-cyber text-sm"
             placeholder="Second hash value"
           />
           <button type="button" onClick={runCompare} className="btn-cyber btn-secondary btn-sm mt-3">
@@ -141,23 +155,27 @@ export default function HashWorkbenchPanel() {
               <p className={compareResult.match ? 'text-status-pass' : 'text-status-fail'}>
                 {compareResult.match ? 'Hashes match.' : 'Hashes differ.'}
               </p>
-              <p className="mt-2 font-mono text-xs text-muted-foreground">
+              <p className="mt-2 font-mono text-xs text-muted-foreground" title={compareResult.actual}>
                 {compareResult.actual}
               </p>
             </div>
           ) : null}
         </div>
 
-        <div className="rounded-lg border border-border bg-surface p-4">
+        <div className="glass-card p-4">
           <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
             <FileDigit size={16} /> File Hashing
           </div>
+          <label htmlFor="hash-file-input" className="mb-1.5 block text-xs text-muted-foreground">Choose a file to hash</label>
           <input
+            id="hash-file-input"
             type="file"
             className="input-cyber text-sm"
-            onChange={(event) => void runFileHash(event.target.files?.[0] || null)}
+            onChange={(event) => runFileHash(event.target.files?.[0] || null)}
           />
-          {progressLabel && <p className="mt-3 text-xs text-muted-foreground">{progressLabel}</p>}
+          {progressLabel && (
+            <p className="mt-3 text-xs text-muted-foreground" role="status" aria-live="polite">{progressLabel}</p>
+          )}
           {fileResult ? (
             <div className="mt-3 space-y-2 text-xs">
               <p className="text-muted-foreground">Chunked read path used: {fileResult.chunkCount} chunk(s)</p>

@@ -42,7 +42,7 @@ const labs = [
 
 export default function LabsPage() {
   return (
-    <div className="page-shell-tight max-w-5xl space-y-8">
+    <div className="page-shell-tight max-w-5xl space-y-6">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <FlaskConical size={24} className="text-cyber-cyan" /> Security Labs
@@ -52,7 +52,7 @@ export default function LabsPage() {
         </p>
       </motion.div>
 
-      <div className="glass-card flex items-start gap-3 border-status-warn/20 p-4">
+      <div className="glass-card flex items-start gap-3 border-status-warn/20 p-4" role="alert">
         <AlertTriangle size={18} className="text-cyber-amber shrink-0 mt-0.5" />
         <div className="text-sm text-muted-foreground">
           <strong className="text-cyber-amber">Sandbox-only education.</strong> These labs run against local simulated targets only. Do not point these concepts at external systems; focus on the mitigation panels before applying changes in real applications.
@@ -74,13 +74,13 @@ export default function LabsPage() {
                 </div>
                 <div>
                   <h2 className="font-semibold transition-colors group-hover:text-foreground">{lab.name}</h2>
-                  <span className="badge badge-amber text-[10px]">{lab.difficulty}</span>
+                  <span className="badge badge-amber text-xs">{lab.difficulty}</span>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground flex-1">{lab.description}</p>
               <div className="flex flex-wrap gap-1.5 mt-4">
                 {lab.topics.map((topic) => (
-                  <span key={topic} className="badge border border-border bg-[color:var(--panel-subtle)] text-[10px] text-muted-foreground">{topic}</span>
+                  <span key={topic} className="badge border border-border bg-[color:var(--panel-subtle)] text-xs text-muted-foreground">{topic}</span>
                 ))}
               </div>
               <div className="flex items-center gap-1 mt-4 text-xs text-cyber-cyan">

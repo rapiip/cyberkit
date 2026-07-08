@@ -111,8 +111,8 @@ export default function SQLiLab() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <FlaskConical className="text-cyber-red" /> 
+        <h1 className="text-2xl font-bold flex items-center gap-3">
+          <FlaskConical className="text-cyber-red" size={24} />
           SQL Injection Lab
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -120,7 +120,7 @@ export default function SQLiLab() {
         </p>
       </motion.div>
 
-      <div className="rounded-xl border border-status-warn/20 bg-[color:var(--panel-subtle)] p-4 flex items-start gap-3 text-xs">
+      <div className="glass-card p-4 flex items-start gap-3 text-xs" role="alert">
         <AlertTriangle size={16} className="text-cyber-amber shrink-0 mt-0.5" />
         <span className="text-muted-foreground">
           <strong className="text-cyber-amber">Educational Sandbox.</strong> No real databases are impacted. Verify your SQL injection skills below.
@@ -148,7 +148,7 @@ export default function SQLiLab() {
                 }`}
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
                     activeChallenge === i ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-cyber-cyan' : 'bg-muted text-muted-foreground'
                   }`}>
                     Level {c.level}
@@ -163,30 +163,38 @@ export default function SQLiLab() {
 
         {/* Right Side: Interactive vulnerable form */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="bg-surface border border-border rounded-xl p-6">
+          <div className="glass-card p-6">
             <h2 className="text-sm font-semibold mb-5 flex items-center gap-2 text-foreground">
               <Code size={16} className="text-cyber-cyan" /> Simulated Portal Login
             </h2>
-            
+
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Username</label>
-                <input 
-                  value={username} 
-                  onChange={e => setUsername(e.target.value)} 
-                  placeholder="Enter username..." 
-                  className="input-cyber px-4 py-2.5 text-sm font-mono" 
+                <label htmlFor="sqli-username" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Username</label>
+                <input
+                  id="sqli-username"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder="Enter username..."
+                  className="input-cyber px-4 py-2.5 text-sm font-mono"
                 />
               </div>
-              
+
               <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">Password</label>
-                <input 
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)} 
-                  placeholder="Enter password..." 
-                  className="input-cyber px-4 py-2.5 text-sm font-mono" 
-                  disabled={activeChallenge === 1 && username.includes("'")} 
+                <label htmlFor="sqli-password" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 block">
+                  Password
+                  {activeChallenge === 1 && username.includes("'") && (
+                    <span className="ml-2 text-cyber-amber font-normal normal-case tracking-normal">(disabled by SQL comment — password check bypassed)</span>
+                  )}
+                </label>
+                <input
+                  id="sqli-password"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Enter password..."
+                  className="input-cyber px-4 py-2.5 text-sm font-mono"
+                  disabled={activeChallenge === 1 && username.includes("'")}
+                  aria-disabled={activeChallenge === 1 && username.includes("'")}
                 />
               </div>
               
@@ -252,7 +260,7 @@ export default function SQLiLab() {
           </div>
 
           {/* Secure fix comparison info */}
-          <div className="bg-surface border border-border rounded-xl p-6">
+          <div className="glass-card p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground">
                 <Shield size={16} className="text-status-pass" /> Secure Fix Comparison

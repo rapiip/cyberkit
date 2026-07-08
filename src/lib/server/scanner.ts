@@ -4,6 +4,7 @@ import https from 'https';
 import net from 'net';
 import { NextResponse } from 'next/server';
 import { domainToASCII } from 'url';
+import { logger } from './logger';
 
 const dnsPromises = dns.promises;
 
@@ -180,7 +181,11 @@ export function withTimeoutSignal(timeoutMs: number) {
   };
 }
 
-export async function fetchWithTimeout(input: string | URL, init: RequestInit = {}, timeoutMs = TIMEOUTS.httpMs) {
+export interface CyberKitRequestInit extends RequestInit {
+  allowUntrustedCerts?: boolean;
+}
+
+export async function fetchWithTimeout(input: string | URL, init: CyberKitRequestInit = {}, timeoutMs = TIMEOUTS.httpMs) {
   const timeout = withTimeoutSignal(timeoutMs);
   try {
     return await fetch(input, { redirect: 'manual', ...init, signal: timeout.signal });
@@ -191,18 +196,30 @@ export async function fetchWithTimeout(input: string | URL, init: RequestInit = 
 
 export async function fetchWithRetry(
   input: string | URL,
-  init: RequestInit = {},
+  init: CyberKitRequestInit = {},
   timeoutMs = TIMEOUTS.httpMs,
   attempts = 2
 ) {
   let lastError: unknown;
+  const startTime = Date.now();
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       const response = await fetchWithTimeout(input, init, timeoutMs);
       if (response.status >= 500 && attempt < attempts) continue;
+      logger.info('fetchWithRetry success', {
+        provider: typeof input === 'string' ? new URL(input).hostname : input.hostname,
+        latencyMs: Date.now() - startTime,
+        status: response.status,
+        retryCount: attempt - 1,
+      });
       return response;
     } catch (error) {
       lastError = error;
+      logger.warn('fetchWithRetry attempt failed', {
+        provider: typeof input === 'string' ? new URL(input).hostname : input.hostname,
+        errorCategory: 'NETWORK_ERROR',
+        retryCount: attempt - 1,
+      }, error);
       if (attempt === attempts) throw error;
     }
   }
@@ -400,7 +417,7 @@ export async function assertPublicHostname(hostname: string) {
 
 export async function fetchPublicHttp(
   url: URL,
-  init: RequestInit = {},
+  init: CyberKitRequestInit = {},
   timeoutMs = TIMEOUTS.httpMs,
   maxRedirects = OUTBOUND_LIMITS.maxRedirects
 ) {
@@ -425,7 +442,7 @@ export interface RedirectHop {
 
 export async function fetchPublicHttpWithRedirects(
   url: URL,
-  init: RequestInit = {},
+  init: CyberKitRequestInit = {},
   timeoutMs = TIMEOUTS.httpMs,
   maxRedirects = OUTBOUND_LIMITS.maxRedirects
 ) {
@@ -452,7 +469,7 @@ function responseHeadersFromNode(headers: http.IncomingHttpHeaders) {
   return result;
 }
 
-async function requestPublicHttp(targetUrl: URL, init: RequestInit, timeoutMs: number) {
+async function requestPublicHttp(targetUrl: URL, init: CyberKitRequestInit, timeoutMs: number) {
   const addresses = await resolveAndBlockPrivateIp(targetUrl.hostname);
   const address = addresses[0];
   const isHttps = targetUrl.protocol === 'https:';
@@ -472,7 +489,9 @@ async function requestPublicHttp(targetUrl: URL, init: RequestInit, timeoutMs: n
 
   if (isHttps) {
     options.servername = targetUrl.hostname;
-    options.rejectUnauthorized = false;
+    if (init.allowUntrustedCerts) {
+      options.rejectUnauthorized = false;
+    }
   }
 
   const body =
@@ -482,26 +501,53 @@ async function requestPublicHttp(targetUrl: URL, init: RequestInit, timeoutMs: n
         ? init.body.toString()
         : undefined;
 
+  const startTime = Date.now();
+
   return new Promise<Response>((resolve, reject) => {
     const transport = isHttps ? https : http;
     const req = transport.request(options, (res) => {
       const chunks: Buffer[] = [];
       res.on('data', (chunk: Buffer) => chunks.push(chunk));
       res.on('end', () => {
+        const latencyMs = Date.now() - startTime;
+        const responseHeaders = responseHeadersFromNode(res.headers);
+        if (init.allowUntrustedCerts) {
+          responseHeaders.set('X-CyberKit-Untrusted-Cert', 'true');
+        }
         const response = new Response(Buffer.concat(chunks), {
           status: res.statusCode || 0,
           statusText: res.statusMessage,
-          headers: responseHeadersFromNode(res.headers),
+          headers: responseHeaders,
         });
         Object.defineProperty(response, 'url', { value: targetUrl.toString() });
+        logger.info('requestPublicHttp success', {
+          provider: targetUrl.hostname,
+          latencyMs,
+          status: response.status,
+        });
         resolve(response);
       });
     });
 
     req.on('timeout', () => {
+      const latencyMs = Date.now() - startTime;
+      logger.warn('requestPublicHttp timeout', {
+        provider: targetUrl.hostname,
+        latencyMs,
+        errorCategory: 'NETWORK_ERROR',
+        timeout: true,
+      });
       req.destroy(new PublicTargetError('HTTP request timed out', 504, 'HTTP_TIMEOUT', true));
     });
-    req.on('error', reject);
+    req.on('error', (err) => {
+      const latencyMs = Date.now() - startTime;
+      logger.error('requestPublicHttp error', {
+        provider: targetUrl.hostname,
+        latencyMs,
+        errorCategory: 'NETWORK_ERROR',
+      }, err);
+      reject(err);
+    });
     if (body) req.write(body);
     req.end();
   });

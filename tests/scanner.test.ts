@@ -47,6 +47,10 @@ test('isPrivateIp detects private and loopback ranges', () => {
   assert.equal(isPrivateIp('10.0.0.1'), true);
   assert.equal(isPrivateIp('8.8.8.8'), false);
   assert.equal(isPrivateIp('::1'), true);
+  // IPv4-mapped IPv6
+  assert.equal(isPrivateIp('::ffff:127.0.0.1'), true);
+  assert.equal(isPrivateIp('::ffff:10.0.0.1'), true);
+  assert.equal(isPrivateIp('::ffff:8.8.8.8'), false);
 });
 
 test('clientIpFromRequest ignores proxy headers unless explicitly trusted', () => {
@@ -121,6 +125,50 @@ test('fetchPublicHttp blocks redirects to private IP targets', async () => {
   } finally {
     dns.promises.lookup = originalLookup;
     http.request = originalRequest;
+  }
+});
+
+test('fetchPublicHttp blocks encoded IPs', async () => {
+  // Decimal IP for 127.0.0.1 is 2130706433
+  await assert.rejects(
+    fetchPublicHttp(new URL('http://2130706433')),
+    (error: unknown) =>
+      error instanceof PublicTargetError &&
+      error.message.includes('Private, loopback, link-local, multicast, and metadata IP targets are not allowed')
+  );
+  // Hex IP for 127.0.0.1 is 0x7f000001
+  await assert.rejects(
+    fetchPublicHttp(new URL('http://0x7f000001')),
+    (error: unknown) =>
+      error instanceof PublicTargetError &&
+      error.message.includes('Private, loopback, link-local, multicast, and metadata IP targets are not allowed')
+  );
+});
+
+test('fetchPublicHttp blocks mixed public/private DNS records', async () => {
+  const originalLookup = dns.promises.lookup;
+  dns.promises.lookup = (async (hostname: string) => {
+    if (hostname === 'mixed.example') {
+      return [
+        { address: '93.184.216.34', family: 4 },
+        { address: '127.0.0.1', family: 4 } // Mixed!
+      ];
+    }
+    return (originalLookup as (host: string, options: dns.LookupAllOptions) => Promise<dns.LookupAddress[]>)(
+      hostname,
+      { all: true, verbatim: true }
+    );
+  }) as unknown as typeof dns.promises.lookup;
+
+  try {
+    await assert.rejects(
+      fetchPublicHttp(new URL('http://mixed.example')),
+      (error: unknown) =>
+        error instanceof PublicTargetError &&
+        error.message.includes('Resolved address is private')
+    );
+  } finally {
+    dns.promises.lookup = originalLookup;
   }
 });
 

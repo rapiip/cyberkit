@@ -19,15 +19,15 @@ const techStack = [
 
 export default function AboutPage() {
   return (
-    <div className="page-shell-tight max-w-4xl space-y-8">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="py-8 text-center">
+    <div className="page-shell-tight max-w-4xl space-y-6">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="py-6 text-center">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-2xl font-bold text-cyber-cyan">
           <span>CK</span>
         </div>
         <div className="mx-auto mb-3 w-fit rounded-full border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] px-3 py-1 text-xs text-cyber-cyan">
           Stealth Console profile
         </div>
-        <h1 className="text-3xl font-bold md:text-4xl">CyberKit</h1>
+        <h1 className="text-2xl font-bold md:text-3xl">CyberKit</h1>
         <p className="mx-auto mt-2 max-w-2xl text-muted-foreground">
           A focused cybersecurity workspace for web checks, DNS analysis, encoding, hashing,
           file inspection, and contained learning labs with a quieter analyst-first interface.
@@ -42,7 +42,7 @@ export default function AboutPage() {
           { icon: <FlaskConical size={20} />, value: 4, label: 'Labs' },
           { icon: <FileText size={20} />, value: '∞', label: 'Reports' },
         ].map((stat, i) => (
-          <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="glass-card p-4 text-center">
+          <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="glass-card p-4 text-center">
             <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-cyber-cyan">
               {stat.icon}
             </div>

@@ -115,7 +115,7 @@ export default function Dashboard() {
           Stealth Console workspace system
         </div>
         <div>
-          <h1 className="text-3xl font-bold md:text-5xl">
+          <h1 className="text-2xl font-bold md:text-4xl">
             Analyst-first <span className="gradient-text">security workspace</span>
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
@@ -169,7 +169,7 @@ export default function Dashboard() {
             <h2 id="goal-entry-points" className="text-xl font-semibold">Choose the job to run</h2>
             <p className="mt-1 text-sm text-muted-foreground">Task-first entry points for the most common security workflows.</p>
           </div>
-          <Link href="/workspaces" className="flex items-center gap-1 text-xs text-cyber-cyan">
+          <Link href="/workspaces" className="flex items-center gap-1 text-sm text-cyber-cyan hover:text-foreground">
             Browse workspace catalog <ArrowRight size={13} />
           </Link>
         </div>
@@ -226,7 +226,7 @@ export default function Dashboard() {
       {entries.length > 0 && (
         <section aria-labelledby="recent-activity">
           <div className="mb-4 flex items-center justify-between">
-            <h2 id="recent-activity" className="text-lg font-semibold">Recent activity</h2>
+            <h2 id="recent-activity" className="text-xl font-semibold">Recent activity</h2>
             <Link href="/history" className="text-xs text-muted-foreground hover:text-cyber-cyan">View history</Link>
           </div>
           <div className="glass-card divide-y divide-border">

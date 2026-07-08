@@ -89,26 +89,26 @@ export default function CSRFLab() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             {/* Left Screen: Vulnerable Bank App */}
-            <div className="lg:col-span-6 bg-surface border border-border rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.28)] flex flex-col justify-between min-h-[420px]">
+            <div className="lg:col-span-6 glass-card overflow-hidden flex flex-col justify-between min-h-[420px]">
               <div className="bg-surface px-5 py-3 border-b border-border flex items-center justify-between">
                 <span className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <span className="w-2 h-2 bg-status-pass rounded-full animate-pulse" />
                   SecureBank Portal (Logged In)
                 </span>
-                <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded font-mono">JohnDoe</span>
+                <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded font-mono">JohnDoe</span>
               </div>
 
               <div className="p-6 space-y-6 flex-1">
                 {/* Balance display */}
                 <div className="p-4 bg-surface border border-border rounded-lg flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider">Account Balance</span>
+                    <span className="text-xs text-muted-foreground uppercase font-mono tracking-wider">Account Balance</span>
                     <div className="text-3xl font-extrabold text-foreground flex items-center mt-0.5">
                       <DollarSign size={24} className="text-status-pass" /> {balance.toLocaleString()}
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider">Authentication</span>
+                    <span className="text-xs text-muted-foreground uppercase font-mono tracking-wider">Authentication</span>
                     <span className="block text-status-pass text-xs font-semibold mt-1">Session Cookie Active</span>
                   </div>
                 </div>
@@ -137,7 +137,7 @@ export default function CSRFLab() {
                 {/* Account history */}
                 <div className="space-y-2">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Activity History</span>
-                  <div className="bg-surface border border-border rounded-lg p-3 max-h-24 overflow-y-auto font-mono text-[10px] divide-y divide-border">
+                  <div className="bg-surface border border-border rounded-lg p-3 max-h-24 overflow-y-auto font-mono text-xs divide-y divide-border">
                     {history.map((log, idx) => (
                       <div
                         key={idx}
@@ -154,12 +154,12 @@ export default function CSRFLab() {
             </div>
 
             {/* Right Screen: External training page */}
-            <div className="lg:col-span-6 bg-surface border border-border rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.28)] flex flex-col justify-between min-h-[420px]">
+            <div className="lg:col-span-6 glass-card overflow-hidden flex flex-col justify-between min-h-[420px]">
               <div className="bg-status-fail/10 px-5 py-3 border-b border-border flex items-center justify-between">
                 <span className="text-xs font-semibold text-status-fail uppercase tracking-wider flex items-center gap-1.5">
                   <Shield size={12} /> External Training Page
                 </span>
-                <span className="text-[10px] text-muted-foreground font-mono">sandbox.example/blog</span>
+                <span className="text-xs text-muted-foreground font-mono">sandbox.example/blog</span>
               </div>
 
               <div className="p-6 space-y-5 flex-1 flex flex-col justify-between">
@@ -190,7 +190,7 @@ export default function CSRFLab() {
                     </button>
                   )}
 
-                  <div className="p-3 bg-surface border border-border rounded-lg text-[10px] text-muted-foreground">
+                  <div className="p-3 bg-surface border border-border rounded-lg text-xs text-muted-foreground">
                     <strong>Defensive Insight:</strong> When JohnDoe clicks this button, a vulnerable app would rely only on ambient cookies. The fix is to require a per-request CSRF token and strict cookie policy.
                   </div>
                 </div>
@@ -207,12 +207,13 @@ export default function CSRFLab() {
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.95, opacity: 0 }}
                 className="bg-status-fail/10 border border-status-fail/25 p-5 rounded-xl flex items-start gap-4"
+                aria-live="polite"
               >
                 <AlertTriangle size={24} className="text-cyber-red shrink-0 mt-1" />
                 <div className="space-y-2 flex-1">
                   <div className="flex items-center justify-between">
                     <strong className="text-sm font-semibold text-status-fail">CSRF Simulation Triggered</strong>
-                    <button onClick={resetLab} className="text-[10px] text-muted-foreground hover:text-foreground underline font-mono">Reset Scenario</button>
+                    <button onClick={resetLab} className="text-xs text-muted-foreground hover:text-foreground underline font-mono">Reset Scenario</button>
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     This local simulation shows the CSRF risk: because JohnDoe was authenticated, the browser would automatically include cookies with a state-changing request. Real applications should require anti-CSRF tokens, strict SameSite cookies, and request-origin validation.

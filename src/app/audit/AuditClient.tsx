@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Shield, Play, Check, X, AlertTriangle, Globe, FileDown } from 'lucide-react';
 import { useReportsStore } from '@/lib/store';
 import { exportAuditToPDF } from '@/lib/utils/export';
+import StatusBadge from '@/components/ui/StatusBadge';
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'API connection failed. Please try again.';
@@ -300,8 +301,8 @@ ${(resData.findings || [])
   return (
     <div className="page-shell-tight max-w-5xl space-y-6">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold flex items-center gap-3 tracking-tight">
-          <Shield size={32} className="text-cyber-cyan" /> 
+        <h1 className="text-2xl font-bold flex items-center gap-3 tracking-tight">
+          <Shield size={24} className="text-cyber-cyan" />
           Website Security Audit
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -324,6 +325,8 @@ ${(resData.findings || [])
               className="input-cyber pl-12 pr-4 py-3 text-sm"
               onKeyDown={(e) => e.key === 'Enter' && runAudit()}
               disabled={running}
+              aria-label="Target website URL to audit"
+              aria-busy={running}
             />
           </div>
           <button
@@ -346,7 +349,7 @@ ${(resData.findings || [])
         </div>
 
         {errorMsg && (
-          <div className="mt-4 p-3 bg-status-fail/10 border border-status-fail/20 text-status-fail text-xs rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div role="alert" className="mt-4 p-3 bg-status-fail/10 border border-status-fail/20 text-status-fail text-xs rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <div>
               <div className="font-semibold">{errorMsg}</div>
               {errorCode && <div className="mt-1 text-xs font-mono text-status-fail/80">{errorCode}</div>}
@@ -370,6 +373,7 @@ ${(resData.findings || [])
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="glass-card p-6 space-y-6"
+          aria-live="polite"
         >
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-3">
@@ -465,7 +469,7 @@ ${(resData.findings || [])
                 <div key={finding.id} className="rounded-xl border border-border bg-black/10 p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold text-foreground">{finding.title}</span>
-                    <span className="badge badge-red">{finding.severity}</span>
+                    <StatusBadge status={finding.severity === 'critical' || finding.severity === 'high' ? 'fail' : finding.severity === 'medium' ? 'warn' : 'info'} label={finding.severity} />
                   </div>
                   <p className="mt-2 text-sm leading-6 text-muted-foreground">{finding.evidence}</p>
                   <p className="mt-2 text-sm text-foreground">Next step: {finding.remediation}</p>
@@ -554,21 +558,7 @@ ${(resData.findings || [])
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-semibold text-foreground">{check.name}</span>
-                  <span
-                    className={`text-xs font-medium uppercase px-2 py-0.5 rounded border ${
-                      check.status === 'pass'
-                        ? 'bg-status-pass/5 border-status-pass/20 text-status-pass'
-                        : check.status === 'fail'
-                        ? 'bg-status-fail/5 border-status-fail/20 text-status-fail'
-                        : check.status === 'warn'
-                        ? 'bg-status-warn/5 border-status-warn/20 text-status-warn'
-                        : check.status === 'running'
-                        ? 'bg-cyber-cyan/5 border-cyber-cyan/20 text-cyber-cyan'
-                        : 'bg-muted/30 border-border text-muted-foreground'
-                    }`}
-                  >
-                    {check.status}
-                  </span>
+                  <StatusBadge status={check.status === 'running' ? 'info' : check.status === 'pending' || check.status === 'error' ? (check.status === 'error' ? 'fail' : 'unknown') : check.status} />
                 </div>
                 <p className="text-sm text-muted-foreground mt-0.5">{check.message}</p>
                 {check.details && (
@@ -594,12 +584,8 @@ ${(resData.findings || [])
             <div key={finding.id} className="px-6 py-4 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-foreground">{finding.title}</span>
-                <span className="text-xs font-medium uppercase px-2 py-0.5 rounded border bg-status-fail/5 border-status-fail/20 text-status-fail">
-                  {finding.severity}
-                </span>
-                <span className="text-xs font-medium uppercase px-2 py-0.5 rounded border bg-cyber-cyan/5 border-cyber-cyan/20 text-cyber-cyan">
-                  {finding.confidence}
-                </span>
+                <StatusBadge status={finding.severity === 'critical' || finding.severity === 'high' ? 'fail' : finding.severity === 'medium' ? 'warn' : finding.severity === 'low' ? 'pass' : 'info'} label={finding.severity} />
+                <StatusBadge status="info" label={finding.confidence} />
               </div>
               <p className="text-sm text-muted-foreground">{finding.evidence}</p>
               <p className="text-sm text-foreground">Remediation: {finding.remediation}</p>

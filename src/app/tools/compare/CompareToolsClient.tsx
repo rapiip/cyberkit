@@ -132,8 +132,8 @@ export default function CompareToolsPage() {
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <ArrowLeftRight className="text-cyber-cyan" />
+        <h1 className="text-2xl font-bold flex items-center gap-3">
+          <ArrowLeftRight className="text-cyber-cyan" size={24} />
           Compare Tools Workspace
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -171,8 +171,9 @@ export default function CompareToolsPage() {
                 {/* Dynamic Mode option if tool supports it */}
                 {leftTool.inputs.find(i => i.id === 'mode') && (
                   <div>
-                    <label className="block text-[10px] uppercase font-mono text-muted-foreground mb-1.5">Mode</label>
+                    <label htmlFor="compare-left-mode" className="block text-xs uppercase font-mono text-muted-foreground mb-1.5">Mode</label>
                     <select
+                      id="compare-left-mode"
                       value={leftMode}
                       onChange={(e) => setLeftMode(e.target.value)}
                       className="input-cyber py-1 text-xs"
@@ -186,8 +187,9 @@ export default function CompareToolsPage() {
 
                 {/* Input Textarea */}
                 <div>
-                  <label className="block text-[10px] uppercase font-mono text-muted-foreground mb-1.5">Input Text</label>
+                  <label htmlFor="compare-left-input" className="block text-xs uppercase font-mono text-muted-foreground mb-1.5">Input Text</label>
                   <textarea
+                    id="compare-left-input"
                     value={leftInput}
                     onChange={(e) => setLeftInput(e.target.value)}
                     placeholder="Type or paste text..."
@@ -210,7 +212,7 @@ export default function CompareToolsPage() {
           {/* Results Output Block Left */}
           <div className="space-y-3 pt-4 border-t border-border">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Output Results</span>
+              <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Output Results</span>
               {leftOutput && (
                 <button
                   onClick={sendLeftToRight}
@@ -264,8 +266,9 @@ export default function CompareToolsPage() {
                 {/* Dynamic Mode option if tool supports it */}
                 {rightTool.inputs.find(i => i.id === 'mode') && (
                   <div>
-                    <label className="block text-[10px] uppercase font-mono text-muted-foreground mb-1.5">Mode</label>
+                    <label htmlFor="compare-right-mode" className="block text-xs uppercase font-mono text-muted-foreground mb-1.5">Mode</label>
                     <select
+                      id="compare-right-mode"
                       value={rightMode}
                       onChange={(e) => setRightMode(e.target.value)}
                       className="input-cyber py-1 text-xs"
@@ -279,8 +282,9 @@ export default function CompareToolsPage() {
 
                 {/* Input Textarea */}
                 <div>
-                  <label className="block text-[10px] uppercase font-mono text-muted-foreground mb-1.5">Input Text</label>
+                  <label htmlFor="compare-right-input" className="block text-xs uppercase font-mono text-muted-foreground mb-1.5">Input Text</label>
                   <textarea
+                    id="compare-right-input"
                     value={rightInput}
                     onChange={(e) => setRightInput(e.target.value)}
                     placeholder="Type or paste text..."
@@ -303,7 +307,7 @@ export default function CompareToolsPage() {
           {/* Results Output Block Right */}
           <div className="space-y-3 pt-4 border-t border-border">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">Output Results</span>
+              <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">Output Results</span>
               {rightOutput && (
                 <button
                   onClick={sendRightToLeft}

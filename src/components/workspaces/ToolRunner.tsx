@@ -258,6 +258,7 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
                 setDragOverInputId(null);
                 handleFileSelection(input, event.dataTransfer.files);
               }}
+              aria-label={`${input.label} file selector. Drop a file or choose a file.`}
               aria-describedby={errorMessage ? `${inputId}-error` : undefined}
               className={`w-full rounded-2xl border border-dashed px-4 py-4 text-left transition-colors ${
                 dragOverInputId === input.id
@@ -389,7 +390,14 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
             </button>
           )}
           {running && progress && (
-            <div className="rounded-xl border border-border bg-[color:var(--panel-subtle)] px-3 py-2 text-xs text-muted-foreground">
+            <div
+              className="rounded-xl border border-border bg-[color:var(--panel-subtle)] px-3 py-2 text-xs text-muted-foreground"
+              role="progressbar"
+              aria-valuenow={progress.current}
+              aria-valuemin={0}
+              aria-valuemax={progress.total}
+              aria-label={progress.label}
+            >
               <div className="mb-2 flex items-center justify-between gap-3">
                 <span>{progress.label}</span>
                 <span>{progress.current}/{progress.total}</span>
@@ -483,7 +491,7 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
                       className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-[color:var(--panel-subtle)] px-3 py-2.5 text-sm"
                     >
                       <span className="text-muted-foreground">{item.label}</span>
-                      <span className="max-w-[300px] truncate text-right font-mono text-xs">
+                      <span className="max-w-[300px] truncate text-right font-mono text-xs" title={item.value}>
                         {item.value}
                       </span>
                     </div>

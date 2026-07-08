@@ -9,10 +9,21 @@ import { allToolMetadata, searchToolMetadata } from '@/lib/tools/metadata';
 import { categories } from '@/lib/tools/categories';
 import { useFavoritesStore } from '@/lib/store';
 import type { Difficulty, ExecutionType } from '@/lib/tools/types';
+import StatePanel from '@/components/ui/StatePanel';
 
 export default function ToolsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading tools...</div>}>
+    <Suspense
+      fallback={
+        <div className="page-shell">
+          <StatePanel
+            icon={<span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />}
+            title="Loading tools"
+            description="Gathering the tool catalog."
+          />
+        </div>
+      }
+    >
       <ToolsPageInner />
     </Suspense>
   );
@@ -59,10 +70,13 @@ function ToolsPageInner() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search tools..."
             className="input-cyber pl-10 py-2.5 text-sm"
+            aria-label="Search tools by name or description"
           />
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
+          aria-pressed={showFilters}
+          aria-expanded={showFilters}
           className={`btn-cyber btn-secondary flex items-center gap-2 ${showFilters ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-foreground' : ''}`}
         >
           <Filter size={14} /> Filters
@@ -88,6 +102,7 @@ function ToolsPageInner() {
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(selectedCategory === cat.id ? '' : cat.id)}
+                  aria-pressed={selectedCategory === cat.id}
                   className={`badge cursor-pointer transition-all ${selectedCategory === cat.id ? 'badge-cyan' : 'border border-border bg-[color:var(--panel-subtle)] text-muted-foreground hover:border-border-bright hover:bg-surface-hover'}`}
                 >
                   {cat.name}
@@ -104,6 +119,7 @@ function ToolsPageInner() {
                 <button
                   key={d}
                   onClick={() => setSelectedDifficulty(selectedDifficulty === d ? '' : d)}
+                  aria-pressed={selectedDifficulty === d}
                   className={`badge cursor-pointer transition-all ${selectedDifficulty === d ? 'badge-green' : 'border border-border bg-[color:var(--panel-subtle)] text-muted-foreground hover:border-border-bright hover:bg-surface-hover'}`}
                 >
                   {d}
@@ -120,6 +136,7 @@ function ToolsPageInner() {
                 <button
                   key={e}
                   onClick={() => setSelectedExecution(selectedExecution === e ? '' : e)}
+                  aria-pressed={selectedExecution === e}
                   className={`badge cursor-pointer transition-all ${selectedExecution === e ? 'badge-purple' : 'border border-border bg-[color:var(--panel-subtle)] text-muted-foreground hover:border-border-bright hover:bg-surface-hover'}`}
                 >
                   {e}-side

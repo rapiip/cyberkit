@@ -26,7 +26,7 @@ export default function WorkspacesPage() {
     <div className="page-shell space-y-10">
       <header className="max-w-3xl space-y-3">
         <div className="badge badge-cyan">11 focused workspaces</div>
-        <h1 className="text-3xl font-bold md:text-4xl">Choose a security workflow</h1>
+        <h1 className="text-2xl font-bold md:text-3xl">Choose a security workflow</h1>
         <p className="text-sm leading-6 text-muted-foreground md:text-base">
           CyberKit groups related capabilities around an outcome. Simple encoders, generators,
           references, and classical decoders remain available as utility panels inside each workspace.

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { History, Trash2, ExternalLink, Clock } from 'lucide-react';
 import { useHistoryStore } from '@/lib/store';
@@ -10,20 +10,34 @@ import StatePanel from '@/components/ui/StatePanel';
 
 export default function HistoryPage() {
   const { entries, removeEntry, clearHistory, loadFromStorage } = useHistoryStore();
+  const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
+
+  const handleClear = () => {
+    if (confirmClear) {
+      clearHistory();
+      setConfirmClear(false);
+      return;
+    }
+    setConfirmClear(true);
+  };
 
   return (
     <div className="page-shell-tight space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><History size={24} className="text-muted-foreground" /> Scan History</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><History size={24} className="text-cyber-cyan" /> Scan History</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Review local execution traces, reopen tool panels, and clear stale results when needed.
           </p>
         </div>
         {entries.length > 0 && (
-          <button onClick={clearHistory} className="btn-cyber btn-danger btn-sm"><Trash2 size={12} /> Clear All</button>
+          <div aria-live="polite">
+            <button onClick={handleClear} className="btn-cyber btn-danger btn-sm">
+              <Trash2 size={12} /> {confirmClear ? 'Confirm clear all?' : 'Clear All'}
+            </button>
+          </div>
         )}
       </div>
 
