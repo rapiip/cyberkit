@@ -83,7 +83,7 @@ export default function Sidebar() {
   }, [mobileOpen]);
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/';
+    if (href === '/dashboard') return pathname === '/dashboard' || pathname === '/';
     if (href === '/workspaces') return pathname === '/workspaces';
     return pathname.startsWith(href);
   };

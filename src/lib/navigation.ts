@@ -5,7 +5,7 @@ export interface NavigationItem {
 }
 
 export const primaryNavigation: NavigationItem[] = [
-  { href: '/', label: 'Home', icon: 'home' },
+  { href: '/dashboard', label: 'Dashboard', icon: 'home' },
   { href: '/audit', label: 'Website Audit', icon: 'shield' },
   { href: '/workspaces', label: 'Workspaces', icon: 'grid' },
 ];

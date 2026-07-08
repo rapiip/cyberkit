@@ -14,7 +14,7 @@ export default function NotFound() {
           The requested CyberKit page or tool does not exist. It may have moved, or the link may be broken.
         </p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/" className="btn-cyber btn-primary">
+          <Link href="/dashboard" className="btn-cyber btn-primary">
             Go to Dashboard
           </Link>
           <Link href="/tools" className="btn-cyber btn-secondary">

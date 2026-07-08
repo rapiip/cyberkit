@@ -69,7 +69,7 @@ test('workspace registry keeps generators and CTF decoders in utility workflows'
 
 test('catalog and homepage do not statically import executor registry', async () => {
   const files = await Promise.all([
-    readFile('src/app/DashboardClient.tsx', 'utf8'),
+    readFile('src/app/dashboard/DashboardClient.tsx', 'utf8'),
     readFile('src/app/workspaces/page.tsx', 'utf8'),
     readFile('src/components/layout/CommandPalette.tsx', 'utf8'),
   ]);

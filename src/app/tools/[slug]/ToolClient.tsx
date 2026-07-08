@@ -16,7 +16,7 @@ export default function ToolClient({ tool, relatedTools, categoryName }: ToolCli
   return (
     <div className="mx-auto max-w-7xl p-4 md:p-8">
       <div className="mb-6 flex items-center gap-2 text-xs text-muted-foreground">
-        <Link href="/" className="hover:text-foreground">
+        <Link href="/dashboard" className="hover:text-foreground">
           Home
         </Link>
         <ChevronRight size={12} />

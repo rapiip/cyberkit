@@ -23,7 +23,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
               <button onClick={reset} className="btn-cyber btn-primary">
                 <RotateCcw size={15} /> Retry
               </button>
-              <Link href="/" className="btn-cyber btn-secondary">
+              <Link href="/dashboard" className="btn-cyber btn-secondary">
                 Go to Dashboard
               </Link>
             </div>
