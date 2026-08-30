@@ -1,0 +1,22 @@
+# Normalise line endings so the repository always stores LF and Windows
+# checkouts still get CRLF in the working tree. Without this, every commit from
+# a Windows machine emits "LF will be replaced by CRLF" warnings and diffs can
+# show whole-file changes across platforms.
+* text=auto eol=lf
+
+# Windows-only tooling that expects CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets must never be normalised.
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.zip binary
