@@ -69,8 +69,8 @@ test('workspace registry keeps generators and CTF decoders in utility workflows'
 
 test('catalog and homepage do not statically import executor registry', async () => {
   const files = await Promise.all([
-    readFile('src/app/dashboard/DashboardClient.tsx', 'utf8'),
-    readFile('src/app/workspaces/page.tsx', 'utf8'),
+    readFile('src/app/(app)/dashboard/DashboardClient.tsx', 'utf8'),
+    readFile('src/app/(app)/workspaces/page.tsx', 'utf8'),
     readFile('src/components/layout/CommandPalette.tsx', 'utf8'),
   ]);
   for (const source of files) {
@@ -79,13 +79,47 @@ test('catalog and homepage do not statically import executor registry', async ()
   }
 });
 
+test('a single root layout owns the html and body elements', async () => {
+  // Comments legitimately mention <html>/<body>, so compare against source with
+  // comments stripped to assert on real JSX only.
+  const stripComments = (source: string) =>
+    source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+
+  const [rootLayout, appLayout, landingLayout] = (
+    await Promise.all([
+      readFile('src/app/layout.tsx', 'utf8'),
+      readFile('src/app/(app)/layout.tsx', 'utf8'),
+      readFile('src/app/(landing)/layout.tsx', 'utf8'),
+    ])
+  ).map(stripComments);
+
+  // Next.js only supports multiple root layouts when there is no top-level
+  // layout.tsx. Because src/app/layout.tsx exists, nested layouts must not
+  // render their own document elements or the markup ends up with nested
+  // <html>/<body> pairs and hydration mismatches.
+  assert.match(rootLayout, /<html/);
+  assert.match(rootLayout, /<body/);
+  assert.equal(appLayout.includes('<html'), false);
+  assert.equal(appLayout.includes('<body'), false);
+  assert.equal(landingLayout.includes('<html'), false);
+  assert.equal(landingLayout.includes('<body'), false);
+
+  // The console shell lives in the (app) group so the landing route stays free
+  // of the sidebar and command palette.
+  assert.match(appLayout, /Sidebar/);
+  assert.match(appLayout, /CommandPalette/);
+  assert.match(appLayout, /id="main-content"/);
+  assert.equal(rootLayout.includes('Sidebar'), false);
+  assert.equal(landingLayout.includes('Sidebar'), false);
+});
+
 test('workspace shell exposes mobile, keyboard, loading, empty, and error states', async () => {
   const [sidebar, palette, workspace, loading, error, pipeline, hashPanel] = await Promise.all([
     readFile('src/components/layout/Sidebar.tsx', 'utf8'),
     readFile('src/components/layout/CommandPalette.tsx', 'utf8'),
-    readFile('src/app/workspaces/[workspace]/WorkspaceClient.tsx', 'utf8'),
-    readFile('src/app/workspaces/[workspace]/loading.tsx', 'utf8'),
-    readFile('src/app/workspaces/[workspace]/error.tsx', 'utf8'),
+    readFile('src/app/(app)/workspaces/[workspace]/WorkspaceClient.tsx', 'utf8'),
+    readFile('src/app/(app)/workspaces/[workspace]/loading.tsx', 'utf8'),
+    readFile('src/app/(app)/workspaces/[workspace]/error.tsx', 'utf8'),
     readFile('src/components/workspaces/TransformationPipeline.tsx', 'utf8'),
     readFile('src/components/workspaces/HashWorkbenchPanel.tsx', 'utf8'),
   ]);

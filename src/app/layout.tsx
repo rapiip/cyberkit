@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/layout/Sidebar";
-import CommandPalette from "@/components/layout/CommandPalette";
 import MotionProvider from "@/components/MotionProvider";
 
 const geistSans = Geist({
@@ -49,6 +47,14 @@ export const metadata: Metadata = {
   },
 };
 
+/**
+ * Single root layout for the whole application.
+ *
+ * Next.js only supports multiple root layouts when there is no top-level
+ * `layout.tsx`. Because this file exists, nested layouts such as
+ * `(app)/layout.tsx` and `(landing)/layout.tsx` must never render their own
+ * `<html>` or `<body>` element.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -59,14 +65,8 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex">
-        <MotionProvider>
-          <Sidebar />
-          <main id="main-content" className="flex-1 min-h-screen overflow-x-hidden pt-14 md:pt-0">
-            {children}
-          </main>
-          <CommandPalette />
-        </MotionProvider>
+      <body className="min-h-full">
+        <MotionProvider>{children}</MotionProvider>
       </body>
     </html>
   );

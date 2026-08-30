@@ -1,17 +1,5 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
-import '../globals.css';
 import './landing.css';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
 
 export const metadata: Metadata = {
   title: 'CyberKit — Cybersecurity Toolkit',
@@ -20,12 +8,13 @@ export const metadata: Metadata = {
   alternates: { canonical: '/' },
 };
 
+/**
+ * Marketing shell for the public landing page.
+ *
+ * This is a nested layout: the surrounding `<html>`/`<body>` elements are owned
+ * by `src/app/layout.tsx`. The landing route intentionally renders without the
+ * console sidebar and command palette.
+ */
 export default function LandingLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full">
-        {children}
-      </body>
-    </html>
-  );
+  return <div className="landing-shell min-h-screen">{children}</div>;
 }

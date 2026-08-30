@@ -2,7 +2,7 @@
    Landing Page Styles
    ═══════════════════════════════════════════ */
 
-.landing-root {
+.landing-shell {
   position: relative;
   min-height: 100vh;
   overflow-x: hidden;
