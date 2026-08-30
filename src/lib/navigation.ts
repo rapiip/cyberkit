@@ -11,7 +11,7 @@ export const primaryNavigation: NavigationItem[] = [
 ];
 
 export const secondaryNavigation: NavigationItem[] = [
-  { href: '/tools', label: 'Tool Library', icon: 'file' },
+  { href: '/workspaces/file-triage-ioc', label: 'File Triage', icon: 'file' },
   { href: '/workspaces/domain-ip-intelligence', label: 'Domain / IP', icon: 'radar' },
   { href: '/workspaces/secret-scanner', label: 'Secret Scanner', icon: 'scanner' },
   { href: '/workspaces/cve-kev-intelligence', label: 'CVE / KEV', icon: 'cve' },

@@ -17,8 +17,8 @@ export default function NotFound() {
           <Link href="/dashboard" className="btn-cyber btn-primary">
             Go to Dashboard
           </Link>
-          <Link href="/tools" className="btn-cyber btn-secondary">
-            <Search size={15} /> Browse Tools
+          <Link href="/workspaces" className="btn-cyber btn-secondary">
+            <Search size={15} /> Browse Workspaces
           </Link>
         </div>
         <p className="mt-4 text-xs text-muted-foreground">

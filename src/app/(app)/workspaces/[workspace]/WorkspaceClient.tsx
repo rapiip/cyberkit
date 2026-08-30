@@ -20,6 +20,7 @@ import {
 import ToolRunner from '@/components/workspaces/ToolRunner';
 import HashWorkbenchPanel from '@/components/workspaces/HashWorkbenchPanel';
 import TransformationPipeline from '@/components/workspaces/TransformationPipeline';
+import CompareToolsPanel from '@/components/workspaces/CompareToolsPanel';
 import StatePanel from '@/components/ui/StatePanel';
 import type { ToolMetadata } from '@/lib/tools/metadata';
 import type { WorkspaceDefinition } from '@/lib/tools/workspaces';
@@ -212,8 +213,9 @@ export default function WorkspaceClient({
           {activeTool ? (
             <section aria-labelledby="active-panel-heading">
               {(workspace.id === 'data-transformation' || workspace.id === 'ctf-decoder-workbench') && (
-                <div className="mb-6">
+                <div className="mb-6 space-y-6">
                   <TransformationPipeline workspaceId={workspace.id} />
+                  <CompareToolsPanel workspaceId={workspace.id} />
                 </div>
               )}
               {workspace.id === 'hash-crypto-workbench' && (

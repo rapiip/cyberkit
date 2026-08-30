@@ -6,6 +6,7 @@ import { History, Trash2, ExternalLink, Clock } from 'lucide-react';
 import { useHistoryStore } from '@/lib/store';
 import Link from 'next/link';
 import { allToolMetadata } from '@/lib/tools/metadata';
+import { getWorkspaceToolHref } from '@/lib/tools/workspace-navigation';
 import StatePanel from '@/components/ui/StatePanel';
 
 export default function HistoryPage() {
@@ -46,7 +47,7 @@ export default function HistoryPage() {
           icon={<Clock size={24} />}
           title="No scan history"
           description="Run a tool to save local execution history here."
-          action={<Link href="/tools" className="text-sm text-cyber-cyan hover:text-foreground">Browse Tools</Link>}
+          action={<Link href="/workspaces" className="text-sm text-cyber-cyan hover:text-foreground">Browse workspaces</Link>}
         />
       ) : (
         <div className="space-y-2">
@@ -72,8 +73,8 @@ export default function HistoryPage() {
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className="text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</span>
                       {tool && (
-                        <Link href={`/tools/${tool.slug}`} className="btn-cyber btn-secondary btn-sm" title={`Open ${tool.name}`} aria-label={`Open ${tool.name}`}>
-                          <ExternalLink size={12} /> Open tool
+                        <Link href={getWorkspaceToolHref(tool)} className="btn-cyber btn-secondary btn-sm" title={`Open ${tool.name}`} aria-label={`Open ${tool.name}`}>
+                          <ExternalLink size={12} /> Open panel
                         </Link>
                       )}
                       <button onClick={() => removeEntry(entry.id)} className="btn-cyber btn-ghost btn-sm text-muted-foreground hover:text-cyber-red" title="Delete history entry" aria-label={`Delete history entry for ${entry.toolName}`}>

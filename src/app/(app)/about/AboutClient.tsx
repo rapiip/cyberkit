@@ -89,8 +89,8 @@ export default function AboutPage() {
         <a href="https://github.com" target="_blank" rel="noopener noreferrer" className="btn-cyber btn-secondary">
           <ExternalLink size={16} /> GitHub
         </a>
-        <Link href="/tools" className="btn-cyber btn-primary">
-          <Globe size={16} /> Explore Tools
+        <Link href="/workspaces" className="btn-cyber btn-primary">
+          <Globe size={16} /> Explore Workspaces
         </Link>
       </div>
     </div>

@@ -11,6 +11,8 @@ import {
   suggestTransformOperations,
 } from '../src/lib/tools/transforms/engine';
 import { randomStringTool } from '../src/lib/tools/hashing';
+import { allToolMetadata } from '../src/lib/tools/metadata';
+import { quickRunTransformTool } from '../src/lib/tools/transforms/quick-run';
 import { compareHashValues, hashFileWithProgress, hashText } from '../src/lib/security/hash';
 
 test('network helpers handle IPv4 edge prefixes and contiguous masks', () => {
@@ -81,10 +83,32 @@ test('transform pipeline supports Base64URL, hex, and raw byte boundaries', () =
   );
 });
 
-test('compare workspace imports the shared transform quick runner', async () => {
-  const source = await readFile('src/app/tools/compare/CompareToolsClient.tsx', 'utf8');
+test('compare panel imports the shared transform quick runner', async () => {
+  const source = await readFile('src/components/workspaces/CompareToolsPanel.tsx', 'utf8');
   assert.match(source, /quickRunTransformTool/);
   assert.match(source, /canQuickRunTransformTool/);
+  // The retired /tools/compare route hardcoded the Caesar shift and XOR key.
+  // The panel must forward user-supplied values instead.
+  assert.match(source, /shift: state\.shift/);
+  assert.match(source, /xorKey: state\.xorKey/);
+});
+
+test('quick-run transforms honour caller supplied shift and xor key', async () => {
+  const caesar = allToolMetadata.find((tool) => tool.id === 'caesar-cipher');
+  const xor = allToolMetadata.find((tool) => tool.id === 'xor-helper');
+  assert.ok(caesar);
+  assert.ok(xor);
+
+  assert.equal(await quickRunTransformTool(caesar, { input: 'abc', mode: 'encrypt' }), 'def');
+  assert.equal(await quickRunTransformTool(caesar, { input: 'abc', mode: 'encrypt', shift: 1 }), 'bcd');
+  assert.equal(await quickRunTransformTool(caesar, { input: 'abc', mode: 'encrypt', shift: 5 }), 'fgh');
+
+  const defaultXor = await quickRunTransformTool(xor, { input: 'CyberKit' });
+  const customXor = await quickRunTransformTool(xor, { input: 'CyberKit', xorKey: 'secret' });
+  assert.notEqual(defaultXor, customXor);
+
+  // XOR is its own inverse, so re-applying the same key must round-trip.
+  assert.equal(await quickRunTransformTool(xor, { input: customXor, xorKey: 'secret' }), 'CyberKit');
 });
 
 test('random string generator reports unbiased selection metadata', async () => {
