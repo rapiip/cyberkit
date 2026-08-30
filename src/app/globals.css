@@ -118,6 +118,21 @@ html {
 
 /* ═══════ Glass Card ═══════ */
 
+/*
+ * Component classes are declared inside `@layer components` so that Tailwind
+ * utilities, which live in the later `@layer utilities`, can override them.
+ *
+ * Unlayered CSS beats every layered rule regardless of specificity. While these
+ * classes were unlayered, `.input-cyber { padding: 10px 14px }` silently won
+ * over `pl-12`, so inputs with a leading icon rendered the icon on top of the
+ * placeholder text. The same applied to `.btn-cyber` padding versus `px-*`/`py-*`
+ * and to every `font-size` versus `text-*`.
+ *
+ * Keep base element styles (scrollbars, focus rings, reduced motion) out of this
+ * layer so they continue to win.
+ */
+@layer components {
+
 .glass-card {
   background: linear-gradient(180deg, rgba(29, 35, 41, 0.96), rgba(22, 27, 32, 0.92));
   backdrop-filter: blur(14px);
@@ -429,6 +444,9 @@ textarea.input-cyber {
   background: rgba(123, 199, 214, 0.12);
 }
 
+} /* end @layer components */
+
+/* Focus styles stay unlayered so the focus ring always wins over utilities. */
 :focus-visible {
   outline: 2px solid rgba(123, 199, 214, 0.65);
   outline-offset: 2px;
@@ -444,6 +462,9 @@ textarea:focus-visible,
   outline: none;
   box-shadow: 0 0 0 2px var(--background), 0 0 0 4px rgba(123, 199, 214, 0.55);
 }
+
+/* Layout and grade helpers continue the components layer. */
+@layer components {
 
 .page-shell {
   margin-inline: auto;
@@ -486,6 +507,8 @@ textarea:focus-visible,
 .grade-d { background: rgba(193, 140, 95, 0.12); color: #dfbb9a; border: 2px solid rgba(193, 140, 95, 0.24); }
 .grade-f { background: rgba(196, 110, 110, 0.12); color: #dfb0b0; border: 2px solid rgba(196, 110, 110, 0.24); }
 
+} /* end @layer components */
+
 /* ═══════ Pulse Animation ═══════ */
 
 @keyframes pulse-glow {
@@ -498,8 +521,10 @@ textarea:focus-visible,
   100% { transform: translateY(100%); }
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
+@layer components {
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
 }
 
 /* ═══════ Responsive ═══════ */
