@@ -99,6 +99,26 @@ test('Next redirects cover the catalog, compare route, and every legacy tool URL
   }
 });
 
+test('the dev server allows loopback-by-IP and private LAN origins', async () => {
+  // The dev server answers /_next/* with 403 unless the requesting Host is an
+  // allowed dev origin. Without these entries, opening the app at
+  // http://127.0.0.1:3001 served the HTML but blocked every chunk, so React never
+  // hydrated and the console silently lost all interactivity.
+  const origins = nextConfig.allowedDevOrigins;
+  assert.ok(Array.isArray(origins), 'allowedDevOrigins must be configured');
+  assert.ok(origins.includes('127.0.0.1'), 'loopback by IP must be allowed');
+  assert.ok(origins.includes('[::1]'), 'IPv6 loopback must be allowed');
+  assert.ok(
+    origins.some((origin) => origin.startsWith('192.168.')),
+    'private LAN origins must be allowed so other devices can reach the dev server'
+  );
+
+  // Playwright drives 127.0.0.1, so a missing entry would make local E2E runs
+  // test an unhydrated page.
+  const playwrightConfig = await readFile('playwright.config.ts', 'utf8');
+  assert.match(playwrightConfig, /127\.0\.0\.1/);
+});
+
 test('workspace registry keeps generators and CTF decoders in utility workflows', () => {
   assert.equal(workspaceRegistry.length, 11);
   const transformation = workspaceRegistry.find((workspace) => workspace.id === 'data-transformation');
