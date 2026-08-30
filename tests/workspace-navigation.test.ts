@@ -195,7 +195,11 @@ test('workspace shell exposes mobile, keyboard, loading, empty, and error states
   assert.match(workspace, /TransformationPipeline/);
   assert.match(loading, /aria-label="Loading workspace"/);
   assert.match(error, /Workspace could not be loaded/);
-  assert.match(error, /unstable_retry/);
+  // `retry` became stable in Next 16.3. Assert on the prop signature so the
+  // unstable name cannot creep back, and ignore prose in comments.
+  const errorCode = error.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.match(errorCode, /retry:\s*\(\)\s*=>\s*void/);
+  assert.equal(errorCode.includes('unstable_retry'), false);
   assert.match(pipeline, /Save recipe/);
   assert.match(pipeline, /Undo/);
   assert.match(pipeline, /Input encoding/);

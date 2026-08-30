@@ -754,7 +754,6 @@ async function hitBucket(key: string, limit: number, windowMs: number) {
 }
 
 export async function consumeRateLimit(request: Request, hostname: string, options: RateLimitOptions) {
-  const now = Date.now();
   const ip = clientIpFromRequest(request);
   const windowMs = options.windowMs ?? 60_000;
   const ipRetry = await hitBucket(`${options.endpoint}:ip:${ip}`, options.ipLimit ?? 30, windowMs);
@@ -765,11 +764,18 @@ export async function consumeRateLimit(request: Request, hostname: string, optio
   if (targetRetry) return { limited: true, retryAfter: targetRetry };
 
   if (options.cooldownMs) {
-    const cooldownKey = `${options.endpoint}:cooldown:${ip}:${hostname}`;
-    const cooldown = memoryCounters.get(cooldownKey);
-    const remaining = cooldown && cooldown.expiresAt > now ? cooldown.expiresAt - now : 0;
-    if (remaining > 0) return { limited: true, retryAfter: Math.ceil(remaining / 1000) };
-    await hitBucket(cooldownKey, 1, options.cooldownMs);
+    // A cooldown is a bucket of one over the cooldown window. It previously wrote
+    // through hitBucket, which prefers Redis, but read back from the in-memory map
+    // only. With Redis configured the memory entry was never written, so the
+    // cooldown silently never fired in exactly the deployment that needs it. Going
+    // through hitBucket for both the read and the write also makes it a single
+    // atomic increment instead of a check-then-set race.
+    const cooldownRetry = await hitBucket(
+      `${options.endpoint}:cooldown:${ip}:${hostname}`,
+      1,
+      options.cooldownMs
+    );
+    if (cooldownRetry) return { limited: true, retryAfter: cooldownRetry };
   }
 
   return { limited: false, retryAfter: 0 };

@@ -5,7 +5,12 @@ import Link from 'next/link';
 import { AlertOctagon, RotateCcw } from 'lucide-react';
 import StatePanel from '@/components/ui/StatePanel';
 
-export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+/**
+ * Uses `retry` rather than `reset`: a view that failed to render needs its
+ * contents re-fetched, not merely the error state cleared. `reset` only re-renders
+ * the existing children, so a transient data failure would immediately fail again.
+ */
+export default function Error({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
     console.error(error);
   }, [error]);
@@ -20,7 +25,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
           description="CyberKit could not render this view. Retry the view or return to the dashboard."
           action={
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <button onClick={reset} className="btn-cyber btn-primary">
+              <button onClick={() => retry()} className="btn-cyber btn-primary">
                 <RotateCcw size={15} /> Retry
               </button>
               <Link href="/dashboard" className="btn-cyber btn-secondary">

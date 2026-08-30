@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ArrowRight, Workflow } from 'lucide-react';
 import ToolRunner from '@/components/workspaces/ToolRunner';
 import HashWorkbenchPanel from '@/components/workspaces/HashWorkbenchPanel';
@@ -20,16 +21,17 @@ import type { WorkspaceDefinition } from '@/lib/tools/workspaces';
 interface WorkspaceClientProps {
   workspace: WorkspaceDefinition;
   tools: ToolMetadata[];
-  initialToolId?: string;
 }
 
-export default function WorkspaceClient({
-  workspace,
-  tools,
-  initialToolId,
-}: WorkspaceClientProps) {
+export default function WorkspaceClient({ workspace, tools }: WorkspaceClientProps) {
+  // Read on the client so the page itself stays statically prerenderable, which
+  // is what lets an unknown workspace segment return a real 404 instead of a 200
+  // carrying the not-found body.
+  const searchParams = useSearchParams();
+  const requestedToolId = searchParams.get('tool') ?? undefined;
+
   const initialTool =
-    tools.find((tool) => tool.id === initialToolId) ??
+    tools.find((tool) => tool.id === requestedToolId) ??
     tools.find((tool) => workspace.primaryToolIds.includes(tool.id)) ??
     tools[0];
   const [activeToolId, setActiveToolId] = useState(initialTool?.id ?? '');

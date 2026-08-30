@@ -16,6 +16,7 @@ import {
   PublicTargetError,
   readJsonResponse,
   readTextResponse,
+  resetScannerState,
 } from '../src/lib/server/scanner';
 
 test('normalizeHostname accepts domains and strips URL parts', () => {
@@ -344,6 +345,88 @@ test('fetchPublicHttp rejects an oversized content-length before reading a byte'
   } finally {
     dns.promises.lookup = originalLookup;
     https.request = originalHttpsRequest;
+  }
+});
+
+test('consumeRateLimit enforces a cooldown on the in-memory path', async () => {
+  resetScannerState();
+  const request = new Request('http://localhost');
+  const options = {
+    endpoint: `cooldown-mem-${crypto.randomUUID()}`,
+    ipLimit: 100,
+    targetLimit: 100,
+    windowMs: 60_000,
+    cooldownMs: 10_000,
+  };
+
+  const first = await consumeRateLimit(request, 'example.com', options);
+  assert.equal(first.limited, false, 'the first call must pass');
+
+  const second = await consumeRateLimit(request, 'example.com', options);
+  assert.equal(second.limited, true, 'a second call inside the cooldown must be refused');
+  assert.ok(second.retryAfter > 0);
+
+  // The cooldown is scoped to the hostname, so a different target is unaffected.
+  const otherTarget = await consumeRateLimit(request, 'other.example', options);
+  assert.equal(otherTarget.limited, false);
+});
+
+test('consumeRateLimit enforces a cooldown on the Redis path', async () => {
+  // Regression: the cooldown used to write through Redis but read back from the
+  // in-memory map, so with Redis configured it never fired at all.
+  resetScannerState();
+  const previousUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const previousToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  process.env.UPSTASH_REDIS_REST_URL = 'https://redis.example';
+  process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token';
+
+  const counters = new Map<string, number>();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    assert.match(String(input), /redis\.example/);
+    const commands = JSON.parse(String(init?.body)) as unknown[][];
+    const results = commands.map((command) => {
+      const [verb, key] = command as [string, string];
+      if (verb === 'INCR') {
+        const next = (counters.get(key) ?? 0) + 1;
+        counters.set(key, next);
+        return { result: next };
+      }
+      if (verb === 'PTTL') return { result: 9_000 };
+      return { result: 1 };
+    });
+    return Response.json(results);
+  }) as typeof fetch;
+
+  try {
+    const request = new Request('http://localhost');
+    const options = {
+      endpoint: `cooldown-redis-${crypto.randomUUID()}`,
+      ipLimit: 100,
+      targetLimit: 100,
+      windowMs: 60_000,
+      cooldownMs: 10_000,
+    };
+
+    const first = await consumeRateLimit(request, 'example.com', options);
+    assert.equal(first.limited, false, 'the first call must pass');
+
+    const second = await consumeRateLimit(request, 'example.com', options);
+    assert.equal(second.limited, true, 'the cooldown must fire even when Redis is configured');
+    assert.ok(second.retryAfter > 0);
+
+    // Confirms the cooldown really went through Redis rather than memory.
+    assert.ok(
+      [...counters.keys()].some((key) => key.startsWith('cyberkit:rate:')),
+      'cooldown must use the Redis rate keyspace'
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL;
+    else process.env.UPSTASH_REDIS_REST_URL = previousUrl;
+    if (previousToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    else process.env.UPSTASH_REDIS_REST_TOKEN = previousToken;
+    resetScannerState();
   }
 });
 
