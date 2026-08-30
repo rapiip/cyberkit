@@ -2,43 +2,19 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import {
-  ArrowRight,
-  Binary,
-  FileScan,
-  Hash,
-  KeyRound,
-  LockKeyhole,
-  Network,
-  Puzzle,
-  Radar,
-  ScanSearch,
-  ShieldAlert,
-  ShieldCheck,
-  Workflow,
-} from 'lucide-react';
+import { ArrowRight, Workflow } from 'lucide-react';
 import ToolRunner from '@/components/workspaces/ToolRunner';
 import HashWorkbenchPanel from '@/components/workspaces/HashWorkbenchPanel';
 import TransformationPipeline from '@/components/workspaces/TransformationPipeline';
 import CompareToolsPanel from '@/components/workspaces/CompareToolsPanel';
 import StatePanel from '@/components/ui/StatePanel';
+import {
+  WORKSPACE_ICON_FALLBACK,
+  workspaceIcons,
+  type WorkspaceIconName,
+} from '@/components/icons';
 import type { ToolMetadata } from '@/lib/tools/metadata';
 import type { WorkspaceDefinition } from '@/lib/tools/workspaces';
-
-const iconMap = {
-  ShieldCheck,
-  Radar,
-  Network,
-  Workflow,
-  KeyRound,
-  Puzzle,
-  Hash,
-  LockKeyhole,
-  FileScan,
-  ScanSearch,
-  ShieldAlert,
-  Binary,
-} as const;
 
 interface WorkspaceClientProps {
   workspace: WorkspaceDefinition;
@@ -57,7 +33,7 @@ export default function WorkspaceClient({
     tools[0];
   const [activeToolId, setActiveToolId] = useState(initialTool?.id ?? '');
   const activeTool = tools.find((tool) => tool.id === activeToolId);
-  const Icon = iconMap[workspace.icon as keyof typeof iconMap] ?? Workflow;
+  const Icon = workspaceIcons[workspace.icon as WorkspaceIconName] ?? WORKSPACE_ICON_FALLBACK;
 
   const primaryTools = useMemo(
     () => workspace.primaryToolIds

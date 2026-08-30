@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import nodeCrypto from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { analyzeCidr, analyzeSubnet, prefixFromMask } from '../src/lib/tools/network/utils';
 import {
@@ -13,7 +14,7 @@ import {
 import { randomStringTool } from '../src/lib/tools/hashing';
 import { allToolMetadata } from '../src/lib/tools/metadata';
 import { quickRunTransformTool } from '../src/lib/tools/transforms/quick-run';
-import { compareHashValues, hashFileWithProgress, hashText } from '../src/lib/security/hash';
+import { compareHashValues, hashFileWithProgress, hashText, md5, md5Bytes } from '../src/lib/security/hash';
 
 test('network helpers handle IPv4 edge prefixes and contiguous masks', () => {
   const slash31 = analyzeCidr('192.0.2.10/31');
@@ -118,6 +119,79 @@ test('random string generator reports unbiased selection metadata', async () => 
   const strings = result.data.strings as string[];
   assert.equal(strings.length, 2);
   assert.match(strings[0], /^[0-9a-f]{8}$/);
+});
+
+test('md5 matches the RFC 1321 test vectors for both string and byte input', async () => {
+  // The codebase previously carried two separate MD5 implementations. These
+  // vectors pin the behaviour of the single consolidated one.
+  const vectors: Array<[string, string]> = [
+    ['', 'd41d8cd98f00b204e9800998ecf8427e'],
+    ['a', '0cc175b9c0f1b6a831c399e269772661'],
+    ['abc', '900150983cd24fb0d6963f7d28e17f72'],
+    ['message digest', 'f96b697d7cb7938d525a2f31aaf161d0'],
+    ['abcdefghijklmnopqrstuvwxyz', 'c3fcd3d76192e4007dfb496cca67e13b'],
+    [
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+      'd174ab98d277d9f5a5611c2c9f419d9f',
+    ],
+    ['12345678901234567890123456789012345678901234567890123456789012345678901234567890', '57edf4a22be3c955ac49da2e2107b67a'],
+  ];
+
+  const encoder = new TextEncoder();
+  for (const [input, expected] of vectors) {
+    assert.equal(md5(input), expected, `md5(${JSON.stringify(input)})`);
+    assert.equal(md5Bytes(encoder.encode(input)), expected, `md5Bytes(${JSON.stringify(input)})`);
+    assert.equal(await hashText('MD5', input), expected, `hashText MD5 ${JSON.stringify(input)}`);
+  }
+
+  // Multi-byte input must be hashed as UTF-8, not as code units.
+  assert.equal(md5('äöü'), md5Bytes(encoder.encode('äöü')));
+});
+
+test('md5 matches node crypto across block boundaries and multi-byte input', () => {
+  const encoder = new TextEncoder();
+  const samples = [
+    '',
+    'a',
+    'abc',
+    'CyberKit',
+    'ä ö ü 日本語 🙂',
+    ...[54, 55, 56, 57, 63, 64, 65, 119, 120, 128, 1000].map((length) => 'x'.repeat(length)),
+  ];
+
+  for (const sample of samples) {
+    const expected = nodeCrypto.createHash('md5').update(sample, 'utf8').digest('hex');
+    assert.equal(md5(sample), expected, `md5 length ${sample.length}`);
+    assert.equal(md5Bytes(encoder.encode(sample)), expected, `md5Bytes length ${sample.length}`);
+  }
+
+  // Random binary payloads, including bytes above 0x7f which exercise the
+  // signed-shift paths in the block assembly.
+  for (let iteration = 0; iteration < 25; iteration += 1) {
+    const bytes = nodeCrypto.randomBytes(1 + Math.floor(Math.random() * 300));
+    const expected = nodeCrypto.createHash('md5').update(bytes).digest('hex');
+    assert.equal(md5Bytes(new Uint8Array(bytes)), expected, `random payload of ${bytes.length} bytes`);
+  }
+});
+
+test('md5 handles block-boundary lengths', () => {
+  const encoder = new TextEncoder();
+  // 55, 56, 57, 63, 64 and 65 bytes exercise the padding and extra-block paths.
+  for (const length of [55, 56, 57, 63, 64, 65, 119, 120]) {
+    const input = 'x'.repeat(length);
+    assert.equal(md5(input), md5Bytes(encoder.encode(input)), `length ${length}`);
+    assert.match(md5(input), /^[0-9a-f]{32}$/, `length ${length} must be 32 hex chars`);
+  }
+});
+
+test('only one MD5 implementation exists in the source tree', async () => {
+  const files = ['src/lib/security/hash.ts', 'src/lib/security/local-analysis.ts'];
+  const sources = await Promise.all(files.map((file) => readFile(file, 'utf8')));
+
+  // The MD5 K constant table is the fingerprint of an implementation.
+  const implementations = sources.filter((source) => source.includes('0xd76aa478')).length;
+  assert.equal(implementations, 1, 'MD5 must be implemented exactly once');
+  assert.match(sources[1], /import \{ md5Bytes \} from '\.\/hash'/);
 });
 
 test('hash helpers verify expected values and compare normalized hashes', async () => {

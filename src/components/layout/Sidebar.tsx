@@ -4,42 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import {
-  BookOpenCheck,
-  Bug,
-  ChevronLeft,
-  ChevronRight,
-  FileScan,
-  FlaskConical,
-  Grid2X2,
-  History,
-  Home,
-  Menu,
-  Radar,
-  ScanSearch,
-  Settings,
-  ShieldCheck,
-  X,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, Menu, X } from 'lucide-react';
 import {
   primaryNavigation,
   secondaryNavigation,
   type NavigationItem,
 } from '@/lib/navigation';
-
-const iconMap = {
-  home: Home,
-  grid: Grid2X2,
-  shield: ShieldCheck,
-  radar: Radar,
-  file: FileScan,
-  scanner: ScanSearch,
-  cve: Bug,
-  labs: FlaskConical,
-  report: BookOpenCheck,
-  history: History,
-  settings: Settings,
-};
+import { navigationIcons } from '@/components/icons';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -90,7 +61,7 @@ export default function Sidebar() {
 
   const renderNavigation = (items: NavigationItem[], isCollapsed: boolean) =>
     items.map((item) => {
-      const Icon = iconMap[item.icon];
+      const Icon = navigationIcons[item.icon];
       const active = isActive(item.href);
       return (
         <Link
