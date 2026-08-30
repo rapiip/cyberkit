@@ -5,6 +5,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FlaskConical, ArrowLeft, Shield, AlertTriangle, Code, DollarSign, Send } from 'lucide-react';
 import Link from 'next/link';
 
+/**
+ * Explicit locale so the server and the browser produce identical markup.
+ *
+ * A bare `toLocaleString()` formats with the runtime's default locale, which is
+ * not the same on the Node server as in the visitor's browser. That mismatch
+ * made React discard and re-render this tree on hydration (React error #418).
+ * The rest of the lab hardcodes en-US amounts such as `$5,000`, so pin en-US.
+ */
+const amountFormat = new Intl.NumberFormat('en-US');
+
 export default function CSRFLab() {
   const [balance, setBalance] = useState(5000);
   const [activeTab, setActiveTab] = useState<'interactive' | 'vulnerable' | 'secure'>('interactive');
@@ -15,7 +25,7 @@ export default function CSRFLab() {
   const handleManualTransfer = (amount: number, recipient: string) => {
     if (balance >= amount) {
       setBalance(prev => prev - amount);
-      setHistory(prev => [`Transferred $${amount} to ${recipient} (authorized)`, ...prev]);
+      setHistory(prev => [`Transferred $${amountFormat.format(amount)} to ${recipient} (authorized)`, ...prev]);
     }
   };
 
@@ -104,7 +114,7 @@ export default function CSRFLab() {
                   <div>
                     <span className="text-xs text-muted-foreground uppercase font-mono tracking-wider">Account Balance</span>
                     <div className="text-3xl font-extrabold text-foreground flex items-center mt-0.5">
-                      <DollarSign size={24} className="text-status-pass" /> {balance.toLocaleString()}
+                      <DollarSign size={24} className="text-status-pass" /> {amountFormat.format(balance)}
                     </div>
                   </div>
                   <div className="text-right">

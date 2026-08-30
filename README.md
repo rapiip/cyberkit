@@ -143,11 +143,15 @@ Mini-tool sederhana tidak ditampilkan sebagai menu utama. Capability tersebut te
 
 CyberKit ditujukan untuk pembelajaran, analisis defensif, CTF, dan audit pada sistem yang Anda miliki atau yang secara eksplisit mengizinkan pengujian. Jangan gunakan tool scanner untuk target pihak ketiga tanpa izin.
 
-API route server-side memiliki validasi target, timeout, dan rate limit dasar agar request jaringan lebih terkendali. Tetap review batasan ini sebelum deployment publik.
+API route server-side memiliki validasi target, timeout, batas ukuran respons, dan rate limit dasar agar request jaringan lebih terkendali. Tetap review batasan ini sebelum deployment publik.
+
+Respons dari target dibatasi saat streaming, bukan setelah seluruh body di-buffer, sehingga target yang mengirim body sangat besar tidak dapat menghabiskan memori server.
 
 Jika `UPSTASH_REDIS_REST_URL` dan `UPSTASH_REDIS_REST_TOKEN` tersedia, CyberKit memakai Upstash Redis untuk cache TTL, rate limit, dan Cloud Sync. Tanpa env tersebut, mode lokal memakai bounded in-memory cache/rate-limit dan Cloud Sync akan nonaktif.
 
 Header proxy seperti `x-forwarded-for` hanya dipercaya jika `CYBERKIT_TRUST_PROXY_HEADERS=true`. Aktifkan hanya di deployment yang mengontrol proxy chain.
+
+Penting untuk deployment publik: tanpa flag tersebut, alamat klien tidak dapat diketahui dari sebuah Route Handler, sehingga seluruh pengunjung berbagi satu bucket rate limit. Budget per-IP karenanya berperilaku sebagai budget global — satu pengguna yang sibuk dapat menghabiskannya untuk semua orang. Budget per-target tetap berlaku per hostname dan menjadi kontrol yang bermakna. Aplikasi mencatat peringatan satu kali saat berjalan di produksi tanpa flag ini. Sebaliknya, jangan aktifkan flag bila klien dapat mengirim header tersebut sendiri, karena header dapat dipalsukan untuk melewati rate limit.
 
 Pwned Password Checker melakukan SHA-1 hashing di browser dan hanya mengirim prefix lima karakter ke backend CyberKit. Backend mengembalikan range HIBP yang sudah diparse; pencocokan suffix tetap di browser.
 

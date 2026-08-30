@@ -195,6 +195,11 @@ export function withTimeoutSignal(timeoutMs: number) {
 
 export interface CyberKitRequestInit extends RequestInit {
   allowUntrustedCerts?: boolean;
+  /**
+   * Hard cap on the bytes buffered from the target, enforced while streaming.
+   * Defaults to OUTBOUND_LIMITS.maxDecompressedBytes.
+   */
+  maxResponseBytes?: number;
 }
 
 export async function fetchWithTimeout(input: string | URL, init: CyberKitRequestInit = {}, timeoutMs = TIMEOUTS.httpMs) {
@@ -534,13 +539,58 @@ async function requestPublicHttp(targetUrl: URL, init: CyberKitRequestInit, time
         : undefined;
 
   const startTime = Date.now();
+  // Enforced while streaming. OUTBOUND_LIMITS was previously only applied by
+  // readJsonResponse/readTextResponse, which run after the entire body is already
+  // buffered here, and routes that call response.text() directly skipped the check
+  // altogether. A hostile or merely huge target could therefore make the server
+  // accumulate unbounded memory before any limit was consulted.
+  const maxResponseBytes = init.maxResponseBytes ?? OUTBOUND_LIMITS.maxDecompressedBytes;
 
   return new Promise<Response>((resolve, reject) => {
     const transport = isHttps ? https : http;
     const req = transport.request(options, (res) => {
+      const declaredLength = Number(res.headers['content-length'] || 0);
+      if (declaredLength > maxResponseBytes) {
+        res.destroy();
+        req.destroy();
+        reject(
+          new PublicTargetError(
+            `Response exceeds limit of ${maxResponseBytes} bytes`,
+            502,
+            'RESPONSE_TOO_LARGE'
+          )
+        );
+        return;
+      }
+
       const chunks: Buffer[] = [];
-      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      let received = 0;
+      let aborted = false;
+
+      res.on('data', (chunk: Buffer) => {
+        if (aborted) return;
+        received += chunk.byteLength;
+        if (received > maxResponseBytes) {
+          aborted = true;
+          res.destroy();
+          req.destroy();
+          logger.warn('requestPublicHttp response too large', {
+            provider: targetUrl.hostname,
+            errorCategory: 'RESPONSE_TOO_LARGE',
+          });
+          reject(
+            new PublicTargetError(
+              `Response exceeds limit of ${maxResponseBytes} bytes`,
+              502,
+              'RESPONSE_TOO_LARGE'
+            )
+          );
+          return;
+        }
+        chunks.push(chunk);
+      });
       res.on('end', () => {
+        if (aborted) return;
         const latencyMs = Date.now() - startTime;
         const responseHeaders = responseHeadersFromNode(res.headers);
         if (init.allowUntrustedCerts) {
@@ -602,13 +652,39 @@ interface RateLimitOptions {
   cooldownMs?: number;
 }
 
+/** Emitted once per process so the warning does not flood the log. */
+let warnedAboutSharedRateLimitBucket = false;
+
+/**
+ * Identifies the caller for rate limiting.
+ *
+ * A Route Handler only sees HTTP headers, so without a trusted proxy header the
+ * real client address is genuinely unknowable. In that case every caller shares
+ * the key `'shared'`, which means the per-IP budget behaves as a single global
+ * budget: one busy user can exhaust it for everyone. The per-target budget still
+ * applies per hostname and remains the meaningful control.
+ *
+ * Set `CYBERKIT_TRUST_PROXY_HEADERS=true` only when your deployment owns the
+ * proxy chain that writes x-forwarded-for/x-real-ip/cf-connecting-ip. If those
+ * headers can be supplied by the client they can also be forged to sidestep the
+ * limit entirely.
+ */
 export function clientIpFromRequest(request: Request) {
   if (process.env.CYBERKIT_TRUST_PROXY_HEADERS === 'true') {
     const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
     const proxyIp = forwarded || request.headers.get('x-real-ip') || request.headers.get('cf-connecting-ip');
     if (proxyIp && net.isIP(proxyIp)) return proxyIp;
   }
-  return 'local';
+
+  if (process.env.NODE_ENV === 'production' && !warnedAboutSharedRateLimitBucket) {
+    warnedAboutSharedRateLimitBucket = true;
+    logger.warn('Per-IP rate limiting is degraded to a single shared bucket', {
+      errorCategory: 'SECURITY_EVENT',
+      reason: 'CYBERKIT_TRUST_PROXY_HEADERS is not enabled, so the client address cannot be determined',
+    });
+  }
+
+  return 'shared';
 }
 
 async function hitBucket(key: string, limit: number, windowMs: number) {

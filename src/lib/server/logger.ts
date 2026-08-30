@@ -3,6 +3,9 @@ export type ErrorCategory =
   | 'NETWORK_ERROR'
   | 'PROVIDER_ERROR'
   | 'RATE_LIMITED'
+  // A target tried to send more than the outbound size cap. Worth separating so
+  // operators can alert on possible resource-exhaustion attempts.
+  | 'RESPONSE_TOO_LARGE'
   | 'VALIDATION_ERROR'
   | 'SYSTEM_ERROR'
   | 'SECURITY_EVENT';

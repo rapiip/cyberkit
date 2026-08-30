@@ -7,6 +7,13 @@ const baseURL = `http://127.0.0.1:${port}`;
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
+  // Locally the suite runs against `next dev`, which compiles routes on demand.
+  // Parallel workers make several first-hit compilations race, so a default 5s
+  // expectation can expire on a cold route even though the page is fine. One
+  // worker plus a longer expectation keeps local runs trustworthy; CI builds
+  // first and serves a warm production output, so it can parallelise.
+  workers: isCI ? undefined : 1,
+  expect: { timeout: isCI ? 5_000 : 15_000 },
   // CI runners are noisier than a workstation, so allow one retry there only.
   retries: isCI ? 1 : 0,
   reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
