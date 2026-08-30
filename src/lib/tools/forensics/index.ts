@@ -5,6 +5,7 @@ import {
   triageFile,
 } from '@/lib/security/local-analysis';
 import { assertFile, optionalString } from '../validation';
+import { enrichIocs, verdictStatus, type EnrichmentOutcome } from '../enrichment-client';
 
 function triageSummaryItems(report: Awaited<ReturnType<typeof triageFile>>) {
   return [
@@ -151,7 +152,7 @@ export const iocExtractorTool: ToolDefinition = {
   inputs: [
     { id: 'input', label: 'Text / Logs', type: 'textarea', placeholder: 'Paste logs, alert text, or decoded strings...' },
     { id: 'file', label: 'Optional File', type: 'file', helperText: 'Optional local file. Strings and metadata are scanned locally without upload.' },
-    { id: 'enableEnrichment', label: 'Explicitly allow provider enrichment', type: 'checkbox', defaultValue: false, helperText: 'Disabled by default. This build performs local analysis only unless a provider is configured later.' },
+    { id: 'enableEnrichment', label: 'Explicitly allow provider enrichment', type: 'checkbox', defaultValue: false, helperText: 'Disabled by default. When enabled, validated IP, domain, URL, and hash indicators are sent through the CyberKit backend to the configured reputation providers (VirusTotal, AbuseIPDB, URLhaus). Nothing is sent while this is off.' },
   ],
   execute: async (inputs, context) => {
     const pasted = optionalString(inputs.input).trim();
@@ -170,21 +171,111 @@ export const iocExtractorTool: ToolDefinition = {
     const deduped = Array.from(new Map(iocs.map((ioc) => [`${ioc.type}:${ioc.normalized.toLowerCase()}`, ioc])).values());
     const validCount = deduped.filter((ioc) => ioc.valid).length;
     const enrichmentRequested = Boolean(inputs.enableEnrichment);
+
+    let enrichment: EnrichmentOutcome | null = null;
+    if (enrichmentRequested) {
+      context?.onProgress?.({
+        current: file ? 3 : 2,
+        total: file ? 3 : 2,
+        label: 'Querying configured reputation providers',
+      });
+      try {
+        enrichment = await enrichIocs(deduped, context?.signal);
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') throw error;
+        enrichment = {
+          performed: false,
+          reason: error instanceof Error ? error.message : 'Enrichment request failed.',
+          configuredProviders: [],
+          results: [],
+          skipped: 0,
+        };
+      }
+    }
+
+    const verdictCounts = { malicious: 0, suspicious: 0, harmless: 0, unknown: 0 };
+    for (const result of enrichment?.results ?? []) verdictCounts[result.verdict] += 1;
+
+    const enrichmentLines = enrichment?.performed
+      ? [
+          '',
+          '--- Provider enrichment ---',
+          `Providers: ${enrichment.configuredProviders.join(', ') || 'none'}`,
+          ...enrichment.results.map((result) =>
+            [
+              `${result.type.toUpperCase()} ${result.value} => ${result.verdict.toUpperCase()}`,
+              ...result.sources.map(
+                (source) => `    - ${source.provider}: ${source.verdict} — ${source.error ?? source.detail}`
+              ),
+            ].join('\n')
+          ),
+          ...(enrichment.skipped > 0
+            ? [`${enrichment.skipped} additional indicator(s) were not sent because of the per-request cap.`]
+            : []),
+        ]
+      : enrichmentRequested
+        ? ['', `--- Provider enrichment skipped: ${enrichment?.reason ?? 'unavailable'} ---`]
+        : [];
+
+    const enrichmentItems = enrichment?.performed
+      ? [
+          {
+            label: 'Enrichment',
+            value: `${enrichment.results.length} indicator(s) via ${enrichment.configuredProviders.join(', ') || 'no provider'}`,
+            status: verdictCounts.malicious > 0 ? ('fail' as const) : verdictCounts.suspicious > 0 ? ('warn' as const) : ('pass' as const),
+          },
+          ...enrichment.results.map((result) => ({
+            label: `${result.type.toUpperCase()} verdict`,
+            value: `${result.value} — ${result.verdict}`,
+            status: verdictStatus(result.verdict),
+            details: result.sources.map((source) => `${source.provider}: ${source.error ?? source.detail}`).join(' | '),
+          })),
+        ]
+      : [
+          {
+            label: 'Enrichment',
+            value: enrichmentRequested ? (enrichment?.reason ?? 'Unavailable') : 'Local only',
+            status: enrichmentRequested ? ('warn' as const) : ('pass' as const),
+          },
+        ];
+
     return {
       success: true,
-      summary: `${deduped.length} IOC candidate(s), ${validCount} validated locally${enrichmentRequested ? '; provider enrichment not configured' : ''}`,
-      data: { iocs: deduped, fileReport, enrichmentRequested, enrichmentPerformed: false },
-      rawOutput: deduped.length
-        ? deduped.map((ioc) => `${ioc.type.toUpperCase()} [${ioc.confidence}] ${ioc.normalized}${ioc.defanged ? ' (defanged source)' : ''}`).join('\n')
-        : 'No IOCs found',
-      explanation: enrichmentRequested
-        ? 'Local extraction and validation completed. Provider enrichment was explicitly requested, but this build has no external enrichment provider configured, so no indicators left the browser.'
-        : 'IOC extraction and validation completed locally. No provider enrichment was requested or performed.',
+      summary: `${deduped.length} IOC candidate(s), ${validCount} validated locally${
+        enrichment?.performed
+          ? `; ${enrichment.results.length} enriched (${verdictCounts.malicious} malicious, ${verdictCounts.suspicious} suspicious)`
+          : enrichmentRequested
+            ? '; provider enrichment unavailable'
+            : ''
+      }`,
+      data: {
+        iocs: deduped,
+        fileReport,
+        enrichmentRequested,
+        enrichmentPerformed: Boolean(enrichment?.performed),
+        enrichmentReason: enrichment?.performed ? undefined : enrichment?.reason,
+        enrichmentProviders: enrichment?.configuredProviders ?? [],
+        enrichment: enrichment?.results ?? [],
+        enrichmentVerdictCounts: verdictCounts,
+      },
+      rawOutput: [
+        deduped.length
+          ? deduped
+              .map((ioc) => `${ioc.type.toUpperCase()} [${ioc.confidence}] ${ioc.normalized}${ioc.defanged ? ' (defanged source)' : ''}`)
+              .join('\n')
+          : 'No IOCs found',
+        ...enrichmentLines,
+      ].join('\n'),
+      explanation: enrichment?.performed
+        ? 'Extraction and validation ran locally. Because you explicitly allowed enrichment, the validated IP, domain, URL, and hash indicators were sent to the configured reputation providers through the CyberKit backend, which hides your IP from those providers. Verdicts are provider opinions, not proof.'
+        : enrichmentRequested
+          ? 'Local extraction and validation completed. Provider enrichment was requested but could not run, so no indicator left the browser.'
+          : 'IOC extraction and validation completed locally. No provider enrichment was requested or performed.',
       items: [
         { label: 'IOC Candidates', value: String(deduped.length), status: deduped.length ? 'warn' as const : 'pass' as const },
         { label: 'Validated', value: String(validCount), status: validCount ? 'pass' as const : 'info' as const },
         { label: 'Defanged Inputs', value: String(deduped.filter((ioc) => ioc.defanged).length), status: 'info' as const },
-        { label: 'Enrichment', value: enrichmentRequested ? 'Requested but not configured' : 'Local only', status: enrichmentRequested ? 'warn' as const : 'pass' as const },
+        ...enrichmentItems,
       ],
     };
   },

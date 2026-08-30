@@ -109,6 +109,38 @@ File triage and IOC analysis also run locally by default.
 - IOC extraction supports defanged indicators such as `hxxps://` and `[.]`,
   then validates IPs, domains, URLs, emails, and common hash lengths locally.
 
-Provider enrichment is not performed unless the user explicitly requests it.
-This build does not have an enrichment provider configured, so explicit consent
-still results in local-only processing.
+Provider enrichment is off by default and never happens implicitly.
+
+When the analyst ticks "Explicitly allow provider enrichment", CyberKit sends the
+locally validated indicators to `POST /api/enrich`, which forwards them to the
+reputation providers that are configured on the deployment:
+
+| Provider | Env var | Indicator types |
+| --- | --- | --- |
+| VirusTotal | `VIRUSTOTAL_API_KEY` | ip, domain, url, hash |
+| AbuseIPDB | `ABUSEIPDB_API_KEY` | ip |
+| URLhaus | `URLHAUS_AUTH_KEY` | ip, domain, url |
+
+Constraints on that path:
+
+- only indicators that passed local validation are eligible; emails are never
+  forwarded because no configured provider answers for them;
+- indicator values are re-validated server-side and canonicalised, and URL
+  credentials are stripped before the request leaves;
+- at most 25 indicators per request, deduplicated, with a per-IP rate limit and
+  a short cooldown;
+- verdicts are cached for 30 minutes and responses are `Cache-Control: private,
+  no-store`;
+- a provider outage degrades that provider to an `unknown` verdict instead of
+  failing the analysis;
+- rejected indicators are reported by type and reason only, never by value;
+- the request is routed through the CyberKit backend so the analyst's IP is not
+  exposed to the providers, and `logger` strips indicator values from logs.
+
+`GET /api/enrich` reports which providers are configured so the UI can state
+what would happen before anything is sent. If no key is configured the route
+answers `503 ENRICHMENT_NOT_CONFIGURED` and the panel stays local-only.
+
+Enrichment verdicts are provider opinions. They are not proof, and the IOC panel
+remains excluded from history, reports, analytics, `localStorage`, exports, and
+Cloud Sync.

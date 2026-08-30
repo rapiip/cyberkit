@@ -1626,7 +1626,7 @@ const rawToolMetadata = [
         "label": "Explicitly allow provider enrichment",
         "type": "checkbox",
         "defaultValue": false,
-        "helperText": "Disabled by default. This build performs local analysis only unless a provider is configured later."
+        "helperText": "Disabled by default. When enabled, validated IP, domain, URL, and hash indicators are sent through the CyberKit backend to the configured reputation providers (VirusTotal, AbuseIPDB, URLhaus). Nothing is sent while this is off."
       }
     ]
   },

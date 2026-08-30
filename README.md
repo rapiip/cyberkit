@@ -9,7 +9,7 @@ Aplikasi ini dibangun dengan Next.js App Router, TypeScript, Tailwind CSS, Zusta
 - Homepage berbasis tujuh tujuan pengguna dan command palette untuk mencari workflow atau capability.
 - Sebelas workspace yang dikelompokkan sebagai Core atau Utility, dengan Security Labs terpisah sebagai Experimental.
 - Website Security Audit dengan pengecekan HTTPS, DNS, SSL/TLS, security headers, CORS, cookie security, `robots.txt`, dan `security.txt`.
-- API route server-side untuk DNS, DoH, SSL, headers, CORS, CVE, RDAP, robots, security.txt, pwned password, IP lookup, dan audit agregat.
+- API route server-side untuk DNS, DoH, SSL, headers, CORS, CVE, RDAP, robots, security.txt, pwned password, IP lookup, indicator enrichment, dan audit agregat.
 - Saved reports yang tersimpan lokal, dengan ekspor Markdown/JSON/PDF.
 - Cloud Sync terenkripsi end-to-end di browser menggunakan AES-256-GCM dan PBKDF2-SHA-256; server hanya menyimpan envelope ciphertext dengan expiry.
 - Data Transformation menampung encoding dan Secure Generator sebagai utility panel; CTF Decoder juga ditempatkan sebagai utility workflow.
@@ -127,6 +127,8 @@ Header proxy seperti `x-forwarded-for` hanya dipercaya jika `CYBERKIT_TRUST_PROX
 Pwned Password Checker melakukan SHA-1 hashing di browser dan hanya mengirim prefix lima karakter ke backend CyberKit. Backend mengembalikan range HIBP yang sudah diparse; pencocokan suffix tetap di browser.
 
 Password generator, strength checker, Pwned Password, dan JWT Inspector tidak menulis input atau output ke history, reports, analytics, `localStorage`, export data, atau Cloud Sync. Detail aliran data tersedia di [`docs/privacy/data-flow.md`](docs/privacy/data-flow.md).
+
+IOC enrichment bersifat opt-in eksplisit. Secara default IOC Extractor hanya bekerja lokal. Bila Anda mencentang "Explicitly allow provider enrichment" dan deployment punya `VIRUSTOTAL_API_KEY`, `ABUSEIPDB_API_KEY`, atau `URLHAUS_AUTH_KEY`, indikator yang lolos validasi lokal dikirim ke provider tersebut melalui `/api/enrich`. Tanpa API key, route mengembalikan `503 ENRICHMENT_NOT_CONFIGURED` dan tidak ada indikator yang keluar dari browser.
 
 ## Environment Variables
 
