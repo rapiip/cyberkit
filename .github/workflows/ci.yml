@@ -39,7 +39,11 @@ jobs:
         run: npm audit --audit-level=moderate
 
       - name: License Scanning
-        run: npx license-checker --summary --failOn 'GPL;AGPL;LGPL' || echo 'Warning: Restrictive licenses found'
+        # Block scalar, not a plain one. As a plain scalar the ": " inside
+        # 'Warning: Restrictive licenses found' terminated the value, so the whole
+        # workflow failed to parse and every run completed with zero jobs.
+        run: |
+          npx license-checker --summary --failOn 'GPL;AGPL;LGPL' || echo 'Warning: Restrictive licenses found'
 
   e2e:
     runs-on: ubuntu-latest
@@ -84,7 +88,11 @@ jobs:
         with:
           fetch-depth: 0
       - name: TruffleHog Secret Scan
-        uses: trufflesecurity/trufflehog@main
+        # Pinned to an immutable commit SHA, not a branch. `@main` meant every CI
+        # run executed whatever happened to be on that branch at the time, with
+        # access to the repository checkout. Dependabot's github-actions
+        # ecosystem now proposes the bumps.
+        uses: trufflesecurity/trufflehog@20652fbbdefffcdaa493a5bf57ab2ac6b1db715b # v3.97.1
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}

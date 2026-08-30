@@ -1,12 +1,53 @@
+# Dependabot configuration.
+#
+# Kept deliberately: `npm audit` in CI only runs on push and pull request, so a
+# CVE disclosed against a pinned dependency while nobody pushes would go
+# unnoticed indefinitely. Dependabot's scheduled scan closes that gap, which
+# matters for a tool that audits other people's security posture.
+#
+# The previous configuration only grouped minor and patch updates, so every major
+# bump opened its own pull request. Those accumulated, went stale as master moved
+# and were repeatedly recreated. Majors are now grouped too, so at most two
+# version-update pull requests exist per ecosystem at a time.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore
+      include: scope
     groups:
+      # Routine upkeep. Safe to review and merge together.
       npm-minor-and-patch:
         update-types:
           - minor
           - patch
+      # Majors carry real breakage risk (a TypeScript or ESLint major changes
+      # behaviour), so they arrive as one pull request to be evaluated
+      # deliberately rather than as several competing ones.
+      npm-major:
+        update-types:
+          - major
+
+  # Nothing was watching the CI actions. They run with access to the repository
+  # checkout, so they deserve the same attention as runtime dependencies.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      github-actions:
+        patterns:
+          - '*'
