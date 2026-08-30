@@ -3,8 +3,12 @@ name: CI
 on:
   pull_request:
   push:
+    # The repository's default branch is `master`. This filter said `main`, so no
+    # push to the default branch ever triggered a run - only pull requests did,
+    # and those went unnoticed because the workflow could not be parsed anyway.
+    # Update this list if the default branch is ever renamed.
     branches:
-      - main
+      - master
 
 jobs:
   verify:

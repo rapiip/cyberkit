@@ -50,6 +50,17 @@ test('the CI workflow is parseable and builds a real job graph', async () => {
   assert.ok('push' in workflow.on!, 'must run on push');
   assert.ok('pull_request' in workflow.on!, 'must run on pull_request');
 
+  // The push filter said `main` while this repository's default branch is
+  // `master`, so no push to the default branch ever started a run. Update this
+  // assertion together with the workflow if the default branch is renamed.
+  const push = workflow.on!.push as { branches?: string[] } | null;
+  assert.ok(push, 'the push trigger needs a configuration');
+  assert.ok(Array.isArray(push.branches) && push.branches.length > 0, 'push needs a branch filter');
+  assert.ok(
+    push.branches.includes('master'),
+    `push filter must include the default branch, saw: ${push.branches.join(', ')}`
+  );
+
   const jobs = workflow.jobs ?? {};
   const jobNames = Object.keys(jobs);
   assert.ok(jobNames.length > 0, 'a workflow with zero jobs silently checks nothing');
