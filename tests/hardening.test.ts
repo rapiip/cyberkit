@@ -1,5 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import dns from 'node:dns';
+import http from 'node:http';
+import https from 'node:https';
+import { EventEmitter } from 'node:events';
 import { logger } from '../src/lib/server/logger';
 import { fetchPublicHttp } from '../src/lib/server/scanner';
 import { GET as healthGet } from '../src/app/api/health/route';
@@ -55,18 +59,60 @@ test('health route returns status ok even without providers', async () => {
   }
 });
 
-test('fetchPublicHttp blocks invalid certs unless explicit allowUntrustedCerts is true', async () => {
-  // We use expired.badssl.com to test invalid certs
-  await assert.rejects(
-    () => fetchPublicHttp(new URL('https://expired.badssl.com')),
-    /expired|ECONNRESET|CERT_/i
-  );
-  
-  // If explicitly allowed, it should succeed and mark header
-  const response = await fetchPublicHttp(
-    new URL('https://expired.badssl.com'),
-    { allowUntrustedCerts: true }
-  );
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get('X-CyberKit-Untrusted-Cert'), 'true');
+test('fetchPublicHttp only disables certificate validation when explicitly opted in', async () => {
+  // Offline equivalent of the live badssl.com check in
+  // tests/network/tls-trust.spec.ts. Asserting on the transport options keeps CI
+  // deterministic while still pinning the security-relevant behaviour: TLS
+  // validation must stay on unless the caller opts out, and an opted-out
+  // response must be labelled.
+  const originalLookup = dns.promises.lookup;
+  const originalHttpsRequest = https.request;
+  const observed: https.RequestOptions[] = [];
+
+  dns.promises.lookup = (async () => [
+    { address: '93.184.216.34', family: 4 },
+  ]) as unknown as typeof dns.promises.lookup;
+
+  https.request = ((options: https.RequestOptions, callback?: (res: http.IncomingMessage) => void) => {
+    observed.push(options);
+    const request = new EventEmitter() as http.ClientRequest;
+    request.write = (() => true) as http.ClientRequest['write'];
+    request.setTimeout = (() => request) as http.ClientRequest['setTimeout'];
+    request.destroy = (() => request) as http.ClientRequest['destroy'];
+    request.end = (() => {
+      const response = new EventEmitter() as http.IncomingMessage;
+      response.statusCode = 200;
+      response.statusMessage = 'OK';
+      response.headers = { 'content-type': 'text/html' };
+      process.nextTick(() => {
+        callback?.(response);
+        response.emit('data', Buffer.from('<html></html>'));
+        response.emit('end');
+      });
+      return request;
+    }) as http.ClientRequest['end'];
+    return request;
+  }) as typeof https.request;
+
+  try {
+    const strict = await fetchPublicHttp(new URL('https://strict.example.com'));
+    assert.equal(strict.status, 200);
+    assert.equal(strict.headers.get('X-CyberKit-Untrusted-Cert'), null);
+    // Absent means Node's default of rejectUnauthorized: true.
+    assert.equal(observed.at(-1)?.rejectUnauthorized, undefined);
+
+    const relaxed = await fetchPublicHttp(new URL('https://relaxed.example.com'), {
+      allowUntrustedCerts: true,
+    });
+    assert.equal(relaxed.status, 200);
+    assert.equal(relaxed.headers.get('X-CyberKit-Untrusted-Cert'), 'true');
+    assert.equal(observed.at(-1)?.rejectUnauthorized, false);
+    // SNI must still carry the real hostname even though the socket connects to
+    // the pinned address.
+    assert.equal(observed.at(-1)?.servername, 'relaxed.example.com');
+    assert.equal(observed.at(-1)?.host, '93.184.216.34');
+  } finally {
+    dns.promises.lookup = originalLookup;
+    https.request = originalHttpsRequest;
+  }
 });

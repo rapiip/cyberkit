@@ -14,9 +14,10 @@
     "pretypecheck": "node scripts/clean-next-dev-types.mjs",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "tsx --test tests/**/*.test.ts",
+    "test:network": "tsx --test tests/network/*.spec.ts",
     "test:e2e": "playwright test",
     "test:registry": "tsx --test tests/tool-registry.test.ts",
-    "verify": "npm run lint && npm test && npm run build && npm audit --audit-level=moderate"
+    "verify": "npm run lint && npm run typecheck && npm test && npm run build && npm audit --audit-level=moderate"
   },
   "dependencies": {
     "@types/react-syntax-highlighter": "^15.5.13",
