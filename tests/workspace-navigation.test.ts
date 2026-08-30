@@ -9,6 +9,9 @@ import {
   searchWorkspaceNavigation,
 } from '../src/lib/tools/workspace-navigation';
 import { legacyRouteMappings, workspaceRegistry } from '../src/lib/tools/workspaces';
+import { allToolMetadata } from '../src/lib/tools/metadata';
+import { catalogStats } from '../src/lib/tools/catalog-stats';
+import { securityLabs } from '../src/lib/labs';
 
 test('navigation prioritizes seven core workflows without flat tool routes', () => {
   assert.deepEqual(
@@ -41,6 +44,46 @@ test('keyboard selection stays within available search results', () => {
   assert.equal(nextSelectionIndex(4, 'next', 5), 4);
   assert.equal(nextSelectionIndex(3, 'previous', 5), 2);
   assert.equal(nextSelectionIndex(0, 'next', 0), 0);
+});
+
+test('landing statistics are derived from the registries, not hardcoded', async () => {
+  const [landingSource, pageSource] = await Promise.all([
+    readFile('src/app/(landing)/LandingClient.tsx', 'utf8'),
+    readFile('src/app/(landing)/page.tsx', 'utf8'),
+  ]);
+
+  // The catalogue figures must come in as a prop from the Server Component so
+  // they cannot drift from the registry the way the old "40+ tools" copy did.
+  assert.match(pageSource, /catalogStats/);
+  assert.match(landingSource, /stats\s*\}\s*:\s*\{\s*stats:\s*CatalogStats\s*\}/);
+  assert.match(landingSource, /\{stats\[stat\.key\]\}/);
+
+  // Keeping the metadata module out of the client bundle is the reason for the split.
+  assert.equal(landingSource.includes("@/lib/tools/metadata"), false);
+
+  assert.equal(catalogStats.workspaces, workspaceRegistry.length);
+  assert.equal(catalogStats.tools, allToolMetadata.length);
+  assert.equal(catalogStats.labs, securityLabs.length);
+  assert.ok(catalogStats.categories > 0 && catalogStats.categories <= catalogStats.tools);
+
+  // Every counted category must actually own a tool.
+  const populated = new Set(allToolMetadata.map((tool) => tool.category));
+  assert.equal(catalogStats.categories, [...populated].length);
+});
+
+test('every security lab has a route and matching metadata', async () => {
+  for (const lab of securityLabs) {
+    const source = await readFile(`src/app/(app)/labs/${lab.id}/page.tsx`, 'utf8');
+    assert.ok(source.length > 0, `lab route missing for ${lab.id}`);
+    assert.ok(lab.name.length > 0);
+    assert.ok(lab.description.length > 20, `${lab.id} needs a description`);
+    assert.ok(lab.topics.length > 0, `${lab.id} needs topics`);
+  }
+
+  const labsClient = await readFile('src/app/(app)/labs/LabsClient.tsx', 'utf8');
+  // The labs page must render the shared registry instead of its own copy.
+  assert.match(labsClient, /from '@\/lib\/labs'/);
+  assert.equal(labsClient.includes("id: 'sql-injection'"), false);
 });
 
 test('Next redirects cover the catalog, compare route, and every legacy tool URL', async () => {

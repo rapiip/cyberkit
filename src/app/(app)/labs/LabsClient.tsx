@@ -3,41 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { FlaskConical, AlertTriangle, Code, ArrowRight } from 'lucide-react';
-
-const labs = [
-  {
-    id: 'sql-injection',
-    name: 'SQL Injection Lab',
-    description: 'Study why unsafe query construction breaks authentication in a contained simulator, then compare it with parameterized query defenses.',
-    difficulty: 'Intermediate',
-    accentClass: 'border-cyber-red/30 bg-cyber-red/10 text-cyber-red',
-    topics: ['Authentication Bypass', 'UNION-based', 'Error-based', 'Parameterized Queries'],
-  },
-  {
-    id: 'xss',
-    name: 'XSS Lab',
-    description: 'Study how unsafe output rendering creates client-side risk in a sandbox, with emphasis on encoding, CSP, and cookie hardening.',
-    difficulty: 'Intermediate',
-    accentClass: 'border-cyber-amber/30 bg-cyber-amber/10 text-cyber-amber',
-    topics: ['Reflected XSS', 'DOM-based XSS', 'Input Sanitization', 'Content Security Policy'],
-  },
-  {
-    id: 'auth-bypass',
-    name: 'Authentication Bypass Lab',
-    description: 'Review authentication logic flaws in a local-only simulation and learn how prepared statements keep credential checks intact.',
-    difficulty: 'Intermediate',
-    accentClass: 'border-cyber-cyan/30 bg-cyber-cyan/10 text-cyber-cyan',
-    topics: ['Authentication Bypass', 'Login Flaws', 'Prepared Statements'],
-  },
-  {
-    id: 'csrf',
-    name: 'CSRF Concept Demo',
-    description: 'Visualize how cookie-only state-changing requests can fail without CSRF tokens, SameSite cookies, and request verification.',
-    difficulty: 'Intermediate',
-    accentClass: 'border-cyber-pink/30 bg-cyber-pink/10 text-cyber-pink',
-    topics: ['Cross-Site Request Forgery', 'SameSite Cookies', 'Anti-CSRF Tokens'],
-  },
-];
+import { securityLabs as labs } from '@/lib/labs';
 
 
 export default function LabsPage() {
