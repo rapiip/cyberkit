@@ -32,6 +32,18 @@ const memoryCache = new Map<string, CacheEntry<unknown>>();
 const memoryCounters = new Map<string, CacheEntry<number>>();
 const MEMORY_MAX_KEYS = 2_000;
 
+/**
+ * Clears the process-local cache and rate-limit counters.
+ *
+ * Only affects the in-memory fallback; Redis-backed state is untouched. Used by
+ * tests to isolate cases that would otherwise share cached provider payloads or
+ * rate-limit buckets across assertions.
+ */
+export function resetScannerState() {
+  memoryCache.clear();
+  memoryCounters.clear();
+}
+
 function boundedSet<T>(store: Map<string, CacheEntry<T>>, key: string, value: CacheEntry<T>) {
   if (store.size >= MEMORY_MAX_KEYS) {
     const now = Date.now();
@@ -469,6 +481,26 @@ function responseHeadersFromNode(headers: http.IncomingHttpHeaders) {
   return result;
 }
 
+/**
+ * Statuses the Fetch spec defines as null-body. Constructing a `Response` with a
+ * body for any of these throws a TypeError.
+ */
+const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
+
+export function isNullBodyStatus(status: number) {
+  return NULL_BODY_STATUSES.has(status);
+}
+
+/**
+ * The `Response` constructor only accepts 200-599. Node can report an undefined
+ * status on a malformed reply, which previously produced status 0 and threw.
+ */
+export function normalizeResponseStatus(status: number | undefined) {
+  if (typeof status !== 'number' || !Number.isFinite(status)) return 502;
+  if (status < 200 || status > 599) return 502;
+  return Math.trunc(status);
+}
+
 async function requestPublicHttp(targetUrl: URL, init: CyberKitRequestInit, timeoutMs: number) {
   const addresses = await resolveAndBlockPrivateIp(targetUrl.hostname);
   const address = addresses[0];
@@ -514,12 +546,21 @@ async function requestPublicHttp(targetUrl: URL, init: CyberKitRequestInit, time
         if (init.allowUntrustedCerts) {
           responseHeaders.set('X-CyberKit-Untrusted-Cert', 'true');
         }
-        const response = new Response(Buffer.concat(chunks), {
-          status: res.statusCode || 0,
-          statusText: res.statusMessage,
-          headers: responseHeaders,
-        });
+        const payload = Buffer.concat(chunks);
+        const status = normalizeResponseStatus(res.statusCode);
+        const response = new Response(
+          // The Fetch spec forbids a body on null-body statuses. A CORS preflight
+          // answered correctly returns 204, so passing the buffer unconditionally
+          // made the Response constructor throw and broke the whole scan.
+          isNullBodyStatus(status) ? null : payload,
+          {
+            status,
+            statusText: res.statusMessage,
+            headers: responseHeaders,
+          }
+        );
         Object.defineProperty(response, 'url', { value: targetUrl.toString() });
+        Object.defineProperty(response, 'cyberkitUpstreamStatus', { value: res.statusCode ?? null });
         logger.info('requestPublicHttp success', {
           provider: targetUrl.hostname,
           latencyMs,
