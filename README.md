@@ -57,7 +57,7 @@ npm run dev
 Buka aplikasi di:
 
 ```text
-http://localhost:3000
+http://localhost:3001
 ```
 
 Build production:
@@ -66,17 +66,41 @@ Build production:
 npm run build
 ```
 
-Jalankan hasil build:
+Jalankan hasil build (default port 3000):
 
 ```bash
 npm run start
 ```
 
-Lint:
+## Perintah Pemeriksaan
+
+Jalankan semuanya sekaligus sebelum commit atau publish:
 
 ```bash
-npm run lint
+npm run verify
 ```
+
+`verify` menjalankan `lint`, `typecheck`, `test`, `build`, lalu `npm audit --audit-level=moderate`.
+
+Perintah individual:
+
+```bash
+npm run lint        # ESLint
+npm run typecheck   # next typegen + tsc --noEmit
+npm test            # unit test, sepenuhnya offline
+npm run test:e2e    # Playwright (chromium)
+```
+
+Beberapa test menghubungi endpoint pihak ketiga sungguhan dan sengaja dipisahkan
+dari suite default agar `npm test` tetap deterministik saat offline:
+
+```bash
+npm run test:network
+```
+
+`npm run test:e2e` memakai `next dev` secara lokal dan `next start` bila variabel
+`CI` diset, sehingga di CI pengujian berjalan terhadap output produksi. Jalankan
+`npm run build` terlebih dahulu bila memakai mode CI.
 
 ## Struktur Proyek
 
