@@ -5,6 +5,8 @@ import http from 'node:http';
 import https from 'node:https';
 import tls from 'node:tls';
 import { EventEmitter } from 'node:events';
+import { readFile } from 'node:fs/promises';
+import { POST as auditPost } from '../src/app/api/audit/route';
 import { POST as corsPost } from '../src/app/api/cors/route';
 import { POST as cvePost } from '../src/app/api/cve/route';
 import { POST as headersPost } from '../src/app/api/headers/route';
@@ -539,6 +541,106 @@ test('a 304 response no longer breaks the header scanner', async () => {
     assert.equal(data.status, 304);
   } finally {
     mocks.restore();
+  }
+});
+
+// ══════════ /api/audit scoring integrity ══════════
+
+test('every documented audit score weight can produce a finding', async () => {
+  const source = await readFile('src/app/api/audit/route.ts', 'utf8');
+
+  const weightsBlock = source.match(/const SCORE_WEIGHTS = \{([\s\S]*?)\} as const;/);
+  assert.ok(weightsBlock, 'SCORE_WEIGHTS block not found');
+
+  const keys = [...weightsBlock[1].matchAll(/^\s*([A-Za-z][A-Za-z0-9]*):\s*\d+,/gm)].map((match) => match[1]);
+  assert.ok(keys.length > 0, 'no score weight keys parsed');
+
+  // maxScore sums every weight, so a weight that never reaches a finding inflates
+  // the denominator and makes a perfect score unreachable in the wrong direction.
+  const body = source.slice(weightsBlock.index! + weightsBlock[0].length);
+  const unused = keys.filter((key) => !new RegExp(`SCORE_WEIGHTS\\.${key}\\b`).test(body));
+  assert.deepEqual(unused, [], `Score weights that never produce a finding: ${unused.join(', ')}`);
+});
+
+test('audit route reports a missing Referrer-Policy header', async () => {
+  const restoreTls = installTlsMock({});
+  const mocks = installHttpMocks((options) => {
+    const path = String(options.path || '/');
+    if (path === '/robots.txt' || path === '/.well-known/security.txt') {
+      return { statusCode: 404, statusMessage: 'Not Found', body: '' };
+    }
+    return {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      body: '<html></html>',
+    };
+  });
+
+  try {
+    const response = await auditPost(jsonRequest({ url: 'https://audit-noreferrer.example.com' }));
+    const data = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(data.success, true);
+    const ids = (data.findings as Array<{ id: string }>).map((finding) => finding.id);
+    assert.ok(ids.includes('referrer-policy-missing'), `expected referrer-policy-missing in ${ids.join(', ')}`);
+  } finally {
+    mocks.restore();
+    restoreTls();
+  }
+});
+
+test('audit route flags a leaky Referrer-Policy value', async () => {
+  const restoreTls = installTlsMock({});
+  const mocks = installHttpMocks((options) => {
+    const path = String(options.path || '/');
+    if (path === '/robots.txt' || path === '/.well-known/security.txt') {
+      return { statusCode: 404, statusMessage: 'Not Found', body: '' };
+    }
+    return {
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'referrer-policy': 'unsafe-url',
+      },
+      body: '<html></html>',
+    };
+  });
+
+  try {
+    const response = await auditPost(jsonRequest({ url: 'https://audit-leakyreferrer.example.com' }));
+    const data = await response.json();
+    const ids = (data.findings as Array<{ id: string }>).map((finding) => finding.id);
+    assert.ok(ids.includes('referrer-policy-weak'), `expected referrer-policy-weak in ${ids.join(', ')}`);
+    assert.equal(ids.includes('referrer-policy-missing'), false);
+  } finally {
+    mocks.restore();
+    restoreTls();
+  }
+});
+
+test('audit route accepts a strict Referrer-Policy without a finding', async () => {
+  const restoreTls = installTlsMock({});
+  const mocks = installHttpMocks((options) => {
+    const path = String(options.path || '/');
+    if (path === '/robots.txt' || path === '/.well-known/security.txt') {
+      return { statusCode: 404, statusMessage: 'Not Found', body: '' };
+    }
+    return {
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'referrer-policy': 'strict-origin-when-cross-origin',
+      },
+      body: '<html></html>',
+    };
+  });
+
+  try {
+    const response = await auditPost(jsonRequest({ url: 'https://audit-strictreferrer.example.com' }));
+    const data = await response.json();
+    const ids = (data.findings as Array<{ id: string }>).map((finding) => finding.id);
+    assert.equal(ids.includes('referrer-policy-missing'), false);
+    assert.equal(ids.includes('referrer-policy-weak'), false);
+  } finally {
+    mocks.restore();
+    restoreTls();
   }
 });
 

@@ -434,6 +434,40 @@ export async function POST(request: Request) {
       );
     }
 
+    // Referrer-Policy carries a documented score weight, so it must be able to
+    // produce a finding. Otherwise the weight only inflates the denominator.
+    const referrerPolicy = (headers['referrer-policy'] || '').trim().toLowerCase();
+    const leakyReferrerPolicies = new Set(['unsafe-url', 'no-referrer-when-downgrade', 'origin-when-cross-origin']);
+    if (!referrerPolicy) {
+      findings.push(
+        makeFinding(
+          'referrer-policy-missing',
+          'Referrer-Policy header is missing',
+          'low',
+          'high',
+          'The response did not set Referrer-Policy, so the browser default decides how much URL data leaks to third parties.',
+          'Send Referrer-Policy: strict-origin-when-cross-origin or no-referrer for sensitive paths.',
+          webResult.finalUrl,
+          ['https://developer.mozilla.org/docs/Web/HTTP/Headers/Referrer-Policy'],
+          SCORE_WEIGHTS.referrerPolicy
+        )
+      );
+    } else if (referrerPolicy.split(',').every((token) => leakyReferrerPolicies.has(token.trim()))) {
+      findings.push(
+        makeFinding(
+          'referrer-policy-weak',
+          'Referrer-Policy leaks referrer data across origins',
+          'low',
+          'high',
+          `Referrer-Policy=${headers['referrer-policy']}.`,
+          'Prefer strict-origin-when-cross-origin or no-referrer so full URLs are not sent to other origins.',
+          webResult.finalUrl,
+          ['https://developer.mozilla.org/docs/Web/HTTP/Headers/Referrer-Policy'],
+          SCORE_WEIGHTS.referrerPolicy
+        )
+      );
+    }
+
     if (!headers['permissions-policy']) {
       findings.push(
         makeFinding(
@@ -622,10 +656,17 @@ export async function POST(request: Request) {
       message: headers['x-content-type-options'] ? 'nosniff is active.' : 'Header missing',
       details: headers['x-content-type-options'] || 'No X-Content-Type-Options header',
     });
+    const referrerPolicyLeaks =
+      referrerPolicy.length > 0 &&
+      referrerPolicy.split(',').every((token) => leakyReferrerPolicies.has(token.trim()));
     checks.push({
       name: 'Referrer Policy',
-      status: headers['referrer-policy'] ? 'pass' : 'warn',
-      message: headers['referrer-policy'] ? `Policy: ${headers['referrer-policy']}` : 'Header missing',
+      status: !referrerPolicy ? 'warn' : referrerPolicyLeaks ? 'warn' : 'pass',
+      message: !referrerPolicy
+        ? 'Header missing'
+        : referrerPolicyLeaks
+          ? `Policy leaks referrer data: ${headers['referrer-policy']}`
+          : `Policy: ${headers['referrer-policy']}`,
       details: headers['referrer-policy'] || 'No Referrer-Policy header',
     });
     checks.push({
