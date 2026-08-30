@@ -7,6 +7,7 @@ import ToolRunner from '@/components/workspaces/ToolRunner';
 import HashWorkbenchPanel from '@/components/workspaces/HashWorkbenchPanel';
 import TransformationPipeline from '@/components/workspaces/TransformationPipeline';
 import CompareToolsPanel from '@/components/workspaces/CompareToolsPanel';
+import WorkspaceReportPanel from '@/components/workspaces/WorkspaceReportPanel';
 import StatePanel from '@/components/ui/StatePanel';
 import {
   WORKSPACE_ICON_FALLBACK,
@@ -210,7 +211,11 @@ export default function WorkspaceClient({
                   <span className="badge badge-green">{activeTool.testCoverage.status} tests</span>
                 </div>
               </div>
-              <ToolRunner key={activeTool.id} tool={activeTool} />
+              <ToolRunner key={activeTool.id} tool={activeTool} workspaceId={workspace.id} />
+
+              <div className="mt-6">
+                <WorkspaceReportPanel workspace={workspace} />
+              </div>
             </section>
           ) : (
             <StatePanel

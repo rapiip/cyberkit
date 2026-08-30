@@ -11,6 +11,7 @@ Aplikasi ini dibangun dengan Next.js App Router, TypeScript, Tailwind CSS, Zusta
 - Website Security Audit dengan pengecekan HTTPS, DNS, SSL/TLS, security headers, CORS, cookie security, `robots.txt`, dan `security.txt`.
 - API route server-side untuk DNS, DoH, SSL, headers, CORS, CVE, RDAP, robots, security.txt, pwned password, IP lookup, indicator enrichment, dan audit agregat.
 - Saved reports yang tersimpan lokal, dengan ekspor Markdown/JSON/PDF.
+- Workspace report lintas tool: hasil beberapa capability panel dalam satu workspace dikumpulkan per sesi (hanya di memori), lalu dapat dirangkum menjadi satu report Markdown/JSON atau disimpan ke Saved Reports. Panel yang privacy-restricted tidak pernah masuk koleksi ini.
 - Cloud Sync terenkripsi end-to-end di browser menggunakan AES-256-GCM dan PBKDF2-SHA-256; server hanya menyimpan envelope ciphertext dengan expiry.
 - Data Transformation menampung encoding dan Secure Generator sebagai utility panel; CTF Decoder juga ditempatkan sebagai utility workflow.
 - Security Labs interaktif untuk SQL Injection, XSS, Auth Bypass, dan CSRF.

@@ -83,6 +83,22 @@ plaintext bytes are zeroed from the working buffer immediately after parsing.
 
 There is no server-side recovery for a forgotten passphrase.
 
+## Workspace Reports
+
+Capability runs inside a workspace are collected in memory so several panels can
+be summarised into one report. That collection is an export path, so it enforces
+the same restriction list as history and saved reports:
+
+- results from `PERSISTENCE_RESTRICTED_TOOL_IDS` panels are refused by the
+  session store, and the report builder refuses them again if called directly;
+- the collection lives only in the current tab's memory. It is never written to
+  `localStorage` and disappears on reload;
+- a workspace whose panels are all restricted states that reporting is disabled
+  rather than silently collecting nothing;
+- raw capability output is excluded from the report unless explicitly requested;
+- saving to Saved Reports goes through the existing report store, which rejects
+  restricted tool ids a third time.
+
 ## Secret Scanner
 
 Secret scanning runs in browser memory by default. CyberKit can scan pasted text

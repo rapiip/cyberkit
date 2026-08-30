@@ -14,15 +14,33 @@ import {
   X,
 } from 'lucide-react';
 import { useHistoryStore } from '@/lib/store';
+import { useWorkspaceSessionStore } from '@/lib/store/workspace-session';
 import { createToolResultExport, normalizeToolResult } from '@/lib/tools/result-model';
 import type { ToolMetadata } from '@/lib/tools/metadata';
 import type { ToolExecutionProgress, ToolInput, ToolResult } from '@/lib/tools/types';
+import type { WorkspaceId } from '@/lib/tools/workspaces';
 
 interface ToolRunnerProps {
   tool: ToolMetadata;
+  /**
+   * Owning workspace. When provided, successful runs are collected so the
+   * workspace can assemble a cross-tool report.
+   */
+  workspaceId?: WorkspaceId;
 }
 
-export default function ToolRunner({ tool }: ToolRunnerProps) {
+/** Input ids that usually carry the thing being investigated, in priority order. */
+const TARGET_INPUT_IDS = ['url', 'hostname', 'ipOrDomain', 'query', 'cidr', 'ip', 'email', 'hash'];
+
+function primaryTarget(values: Record<string, unknown>, fallback: string) {
+  for (const id of TARGET_INPUT_IDS) {
+    const value = values[id];
+    if (typeof value === 'string' && value.trim()) return value.trim().slice(0, 200);
+  }
+  return fallback.slice(0, 200);
+}
+
+export default function ToolRunner({ tool, workspaceId }: ToolRunnerProps) {
   const [formValues, setFormValues] = useState<Record<string, unknown>>(() => {
     const defaults: Record<string, unknown> = {};
     tool.inputs.forEach((input) => {
@@ -42,6 +60,7 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const abortControllerRef = useRef<AbortController | null>(null);
   const addEntry = useHistoryStore((state) => state.addEntry);
+  const recordResult = useWorkspaceSessionStore((state) => state.recordResult);
 
   const validationErrors = useMemo(() => {
     const nextErrors: Record<string, string> = {};
@@ -99,6 +118,20 @@ export default function ToolRunner({ tool }: ToolRunnerProps) {
           resultSummary: nextResult.summary || '',
           rawResult: nextResult.rawOutput || '',
           status: nextResult.success ? 'success' : 'error',
+        });
+      }
+
+      // Collect the run so the workspace can assemble a cross-tool report. The
+      // session store rejects privacy-restricted panels, matching the history
+      // and report stores.
+      if (workspaceId && nextResult.success) {
+        recordResult({
+          workspaceId,
+          toolId: tool.id,
+          toolName: tool.name,
+          inputSummary,
+          target: primaryTarget(formValues, inputSummary),
+          result: nextResult,
         });
       }
     } catch (error) {
