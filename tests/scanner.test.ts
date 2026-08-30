@@ -5,6 +5,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { EventEmitter } from 'node:events';
 import {
+  assertAllowedOutboundPort,
   clientIpFromRequest,
   consumeRateLimit,
   fetchPublicHttp,
@@ -340,6 +341,69 @@ test('fetchPublicHttp rejects an oversized content-length before reading a byte'
   try {
     await assert.rejects(() => fetchPublicHttp(new URL('https://declared-huge.example.com')), /exceeds limit/i);
     assert.equal(dataEmitted, true, 'fixture emitted data, proving the header check rejected first');
+  } finally {
+    dns.promises.lookup = originalLookup;
+    https.request = originalHttpsRequest;
+  }
+});
+
+test('outbound port allowlist rejects service ports and honours configuration', () => {
+  const previous = process.env.CYBERKIT_ALLOWED_OUTBOUND_PORTS;
+  delete process.env.CYBERKIT_ALLOWED_OUTBOUND_PORTS;
+
+  try {
+    // Ordinary and alternate HTTP ports stay usable.
+    for (const port of [80, 443, 8080, 8443]) {
+      assert.equal(assertAllowedOutboundPort(port), port, `port ${port} should be allowed`);
+    }
+
+    // Without this list the scanners double as a port prober.
+    for (const port of [22, 23, 25, 3306, 5432, 6379, 27017, 9200]) {
+      assert.throws(
+        () => assertAllowedOutboundPort(port),
+        (error: unknown) => {
+          assert.ok(error instanceof PublicTargetError);
+          assert.equal(error.code, 'PORT_NOT_ALLOWED');
+          assert.equal(error.status, 400);
+          return true;
+        },
+        `port ${port} must be rejected`
+      );
+    }
+
+    process.env.CYBERKIT_ALLOWED_OUTBOUND_PORTS = '443, 9443';
+    assert.equal(assertAllowedOutboundPort(9443), 9443);
+    assert.throws(() => assertAllowedOutboundPort(8080), /not permitted/i);
+
+    // A malformed override must fall back to the defaults rather than allow all.
+    process.env.CYBERKIT_ALLOWED_OUTBOUND_PORTS = 'not-a-port,,';
+    assert.equal(assertAllowedOutboundPort(443), 443);
+    assert.throws(() => assertAllowedOutboundPort(3306), /not permitted/i);
+  } finally {
+    if (previous === undefined) delete process.env.CYBERKIT_ALLOWED_OUTBOUND_PORTS;
+    else process.env.CYBERKIT_ALLOWED_OUTBOUND_PORTS = previous;
+  }
+});
+
+test('fetchPublicHttp refuses a target on a disallowed port', async () => {
+  const originalLookup = dns.promises.lookup;
+  const originalHttpsRequest = https.request;
+  let connected = false;
+
+  dns.promises.lookup = (async () => [
+    { address: '93.184.216.34', family: 4 },
+  ]) as unknown as typeof dns.promises.lookup;
+  https.request = (() => {
+    connected = true;
+    throw new Error('should never open a socket');
+  }) as unknown as typeof https.request;
+
+  try {
+    await assert.rejects(
+      () => fetchPublicHttp(new URL('https://public.example:6379/')),
+      /not permitted/i
+    );
+    assert.equal(connected, false, 'no socket may be opened to a disallowed port');
   } finally {
     dns.promises.lookup = originalLookup;
     https.request = originalHttpsRequest;

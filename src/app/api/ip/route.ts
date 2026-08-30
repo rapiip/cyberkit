@@ -17,20 +17,33 @@ import {
 } from '@/lib/server/scanner';
 import { logger } from '@/lib/server/logger';
 
-interface IpApiResponse {
-  status: 'success' | 'fail';
+/**
+ * ipwho.is response subset.
+ *
+ * The previous provider (ip-api.com) refuses HTTPS on its free tier — it answers
+ * `403 SSL unavailable for this endpoint` — so the IP or domain under
+ * investigation travelled to the provider in cleartext. For a tool whose whole
+ * purpose is investigating targets, that leaks the investigation itself to any
+ * observer on the path. ipwho.is serves the same fields over HTTPS without a key.
+ */
+interface GeolocationResponse {
+  success?: boolean;
   message?: string;
+  ip?: string;
   country?: string;
-  countryCode?: string;
-  regionName?: string;
+  country_code?: string;
+  region?: string;
   city?: string;
-  zip?: string;
-  lat?: number;
-  lon?: number;
-  timezone?: string;
-  isp?: string;
-  org?: string;
-  as?: string;
+  postal?: string;
+  latitude?: number;
+  longitude?: number;
+  timezone?: { id?: string };
+  connection?: {
+    asn?: number;
+    org?: string;
+    isp?: string;
+    domain?: string;
+  };
 }
 
 async function optionalJson(url: string, init: RequestInit, timeoutMs = TIMEOUTS.httpMs) {
@@ -123,22 +136,22 @@ export async function POST(request: Request) {
     });
     if (rate.limited) return rateLimitResponse(rate.retryAfter);
 
-    const data = await cachedJson(`ip-api:${resolvedIp}`, 10 * 60_000, async () => {
+    const data = await cachedJson(`geo:ipwhois:${resolvedIp}`, 10 * 60_000, async () => {
       const response = await fetchWithRetry(
-        `http://ip-api.com/json/${encodeURIComponent(resolvedIp)}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query`,
-        { headers: { Accept: 'application/json' } },
+        `https://ipwho.is/${encodeURIComponent(resolvedIp)}`,
+        { headers: { Accept: 'application/json', 'User-Agent': 'CyberKit/1.0' } },
         TIMEOUTS.httpMs
       );
-      return await readJsonResponse<IpApiResponse>(response);
+      return await readJsonResponse<GeolocationResponse>(response);
     });
 
-    if (data.status !== 'success') {
+    if (!data.success) {
       return NextResponse.json(
         {
           success: false,
           errorCode: 'GEOLOCATION_LOOKUP_FAILED',
           message: data.message || 'Failed to retrieve geolocation data',
-          details: data.status,
+          details: data.message,
           retryable: true,
           error: data.message || 'Failed to retrieve geolocation data',
         },
@@ -150,22 +163,22 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      provider: 'IP-API',
+      provider: 'ipwho.is',
       timestamp: new Date().toISOString(),
       confidence: 'medium',
       input: query,
       ip: resolvedIp,
       country: data.country,
-      countryCode: data.countryCode,
-      region: data.regionName,
+      countryCode: data.country_code,
+      region: data.region,
       city: data.city,
-      zip: data.zip,
-      latitude: data.lat,
-      longitude: data.lon,
-      timezone: data.timezone,
-      isp: data.isp,
-      organization: data.org,
-      asn: data.as,
+      zip: data.postal,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      timezone: data.timezone?.id,
+      isp: data.connection?.isp,
+      organization: data.connection?.org,
+      asn: data.connection?.asn ? `AS${data.connection.asn}` : undefined,
       precisionDisclaimer: 'IP geolocation is approximate and must not be treated as a precise physical location.',
       threatIntel,
     });

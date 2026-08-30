@@ -203,21 +203,23 @@ test('ip route returns approximate geolocation disclaimer and provider metadata'
   delete process.env.VIRUSTOTAL_API_KEY;
   delete process.env.URLHAUS_AUTH_KEY;
 
+  const outboundUrls: string[] = [];
   globalThis.fetch = (async (input: RequestInfo | URL) => {
-    assert.match(String(input), /^http:\/\/ip-api\.com\/json\/8\.8\.8\.8\?/);
+    const url = String(input);
+    outboundUrls.push(url);
+    assert.match(url, /^https:\/\/ipwho\.is\/8\.8\.8\.8$/);
     return Response.json({
-      status: 'success',
+      success: true,
+      ip: '8.8.8.8',
       country: 'United States',
-      countryCode: 'US',
-      regionName: 'California',
+      country_code: 'US',
+      region: 'California',
       city: 'Mountain View',
-      zip: '94043',
-      lat: 37.4056,
-      lon: -122.0775,
-      timezone: 'America/Los_Angeles',
-      isp: 'Google LLC',
-      org: 'Google Public DNS',
-      as: 'AS15169 Google LLC',
+      postal: '94043',
+      latitude: 37.4056,
+      longitude: -122.0775,
+      timezone: { id: 'America/Los_Angeles' },
+      connection: { asn: 15169, org: 'Google Public DNS', isp: 'Google LLC', domain: 'google.com' },
     });
   }) as typeof fetch;
 
@@ -226,10 +228,27 @@ test('ip route returns approximate geolocation disclaimer and provider metadata'
     const data = await response.json();
     assert.equal(response.status, 200);
     assert.equal(data.success, true);
-    assert.equal(data.provider, 'IP-API');
+    assert.equal(data.provider, 'ipwho.is');
     assert.equal(data.ip, '8.8.8.8');
+    assert.equal(data.country, 'United States');
+    assert.equal(data.countryCode, 'US');
+    assert.equal(data.region, 'California');
+    assert.equal(data.city, 'Mountain View');
+    assert.equal(data.zip, '94043');
+    assert.equal(data.timezone, 'America/Los_Angeles');
+    assert.equal(data.isp, 'Google LLC');
+    assert.equal(data.organization, 'Google Public DNS');
+    assert.equal(data.asn, 'AS15169');
     assert.match(data.precisionDisclaimer, /approximate/i);
     assert.deepEqual(data.threatIntel.configuredProviders, []);
+
+    // The target under investigation must never travel in cleartext. The previous
+    // provider refused HTTPS on its free tier.
+    assert.equal(
+      outboundUrls.every((url) => url.startsWith('https://')),
+      true,
+      `geolocation lookups must use HTTPS, saw: ${outboundUrls.join(', ')}`
+    );
   } finally {
     globalThis.fetch = originalFetch;
     if (previousAbuseKey === undefined) delete process.env.ABUSEIPDB_API_KEY;

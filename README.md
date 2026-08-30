@@ -147,6 +147,10 @@ API route server-side memiliki validasi target, timeout, batas ukuran respons, d
 
 Respons dari target dibatasi saat streaming, bukan setelah seluruh body di-buffer, sehingga target yang mengirim body sangat besar tidak dapat menghabiskan memori server.
 
+Port keluar untuk target yang dimasukkan pengguna dibatasi pada daftar port web (default `80,443,591,3000,8000,8008,8080,8443,8888`, dapat diubah lewat `CYBERKIT_ALLOWED_OUTBOUND_PORTS`). Tanpa batasan ini, endpoint scanner dapat dipakai sebagai port prober terhadap layanan seperti SSH, MySQL, PostgreSQL, Redis, atau MongoDB pada host publik mana pun. Panggilan ke provider pihak ketiga tidak terpengaruh daftar ini.
+
+Geolokasi IP memakai `ipwho.is` melalui HTTPS. Provider sebelumnya menolak HTTPS pada tier gratis, sehingga IP atau domain yang sedang diselidiki terkirim dalam cleartext — membocorkan objek investigasi kepada pengamat jaringan di jalur tersebut.
+
 Jika `UPSTASH_REDIS_REST_URL` dan `UPSTASH_REDIS_REST_TOKEN` tersedia, CyberKit memakai Upstash Redis untuk cache TTL, rate limit, dan Cloud Sync. Tanpa env tersebut, mode lokal memakai bounded in-memory cache/rate-limit dan Cloud Sync akan nonaktif.
 
 Header proxy seperti `x-forwarded-for` hanya dipercaya jika `CYBERKIT_TRUST_PROXY_HEADERS=true`. Aktifkan hanya di deployment yang mengontrol proxy chain.
@@ -167,6 +171,7 @@ Lihat `.env.example` untuk daftar lengkap:
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 - `CYBERKIT_TRUST_PROXY_HEADERS`
+- `CYBERKIT_ALLOWED_OUTBOUND_PORTS`
 - `CLOUD_SYNC_RETENTION_DAYS` (default 30, minimum 1, maksimum 90)
 - `NVD_API_KEY`
 - `SECURITYTRAILS_API_KEY`

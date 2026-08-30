@@ -21,6 +21,46 @@ export const OUTBOUND_LIMITS = {
   maxDecompressedBytes: 1024 * 1024,
 };
 
+/**
+ * Ports the HTTP scanners may reach.
+ *
+ * Every route that calls `fetchPublicHttp` inspects a web target, so there is no
+ * legitimate reason to open a socket to an arbitrary port. Without this list the
+ * endpoints double as a port prober: a caller could point them at 22, 3306, 5432,
+ * 6379 or 27017 on any public host and read the connection outcome from the error
+ * response. Restricting the set removes that capability while leaving ordinary
+ * and alternate HTTP ports usable.
+ *
+ * Override with CYBERKIT_ALLOWED_OUTBOUND_PORTS as a comma-separated list.
+ */
+const DEFAULT_ALLOWED_OUTBOUND_PORTS = [80, 443, 591, 3000, 8000, 8008, 8080, 8443, 8888] as const;
+
+export function allowedOutboundPorts(): Set<number> {
+  const configured = process.env.CYBERKIT_ALLOWED_OUTBOUND_PORTS;
+  if (!configured) return new Set<number>(DEFAULT_ALLOWED_OUTBOUND_PORTS);
+
+  const parsed = configured
+    .split(',')
+    .map((entry) => Number(entry.trim()))
+    .filter((port) => Number.isInteger(port) && port > 0 && port <= 65535);
+
+  return parsed.length > 0 ? new Set(parsed) : new Set<number>(DEFAULT_ALLOWED_OUTBOUND_PORTS);
+}
+
+export function assertAllowedOutboundPort(port: number) {
+  const allowed = allowedOutboundPorts();
+  if (!allowed.has(port)) {
+    throw new PublicTargetError(
+      `Port ${port} is not permitted for outbound scanning`,
+      400,
+      'PORT_NOT_ALLOWED',
+      false,
+      `Allowed ports: ${[...allowed].sort((left, right) => left - right).join(', ')}`
+    );
+  }
+  return port;
+}
+
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 interface CacheEntry<T> {
@@ -510,7 +550,7 @@ async function requestPublicHttp(targetUrl: URL, init: CyberKitRequestInit, time
   const addresses = await resolveAndBlockPrivateIp(targetUrl.hostname);
   const address = addresses[0];
   const isHttps = targetUrl.protocol === 'https:';
-  const port = Number(targetUrl.port || (isHttps ? 443 : 80));
+  const port = assertAllowedOutboundPort(Number(targetUrl.port || (isHttps ? 443 : 80)));
   const method = init.method || 'GET';
   const requestHeaders = new Headers(init.headers);
   requestHeaders.set('Host', targetUrl.host);

@@ -8,7 +8,7 @@ CyberKit employs a hybrid processing model to prioritize privacy and security:
 
 ## 2. Limitations and Confidence
 - **Heuristic Suggestions**: Transform pipelines and format detection (e.g., Base64, Hex) use regex and heuristics, providing a "Confidence" score (Low/Medium/High). It is not deterministic.
-- **IP Geolocation**: Geolocation provided by IP-API is approximate and should never be treated as a precise physical address.
+- **IP Geolocation**: Geolocation provided by ipwho.is over HTTPS is approximate and should never be treated as a precise physical address. The earlier provider refused HTTPS on its free tier, so the target under investigation travelled in cleartext.
 - **Threat Intel Limits**: Unauthenticated external lookups may hit rate limits. The application handles these gracefully with partial degradation.
 
 ## 3. Threat Model
