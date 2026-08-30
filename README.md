@@ -1,190 +1,234 @@
+<div align="center">
+
 # CyberKit
 
-CyberKit adalah produk cybersecurity berbasis workflow untuk audit website, investigasi domain/IP, triage file dan IOC, pemeriksaan secret, CVE/KEV, password, JWT, serta workbench pendukung.
+**A workflow-first security toolkit that runs in your browser.**
 
-Aplikasi ini dibangun dengan Next.js App Router, TypeScript, Tailwind CSS, Zustand, Framer Motion, dan Lucide Icons. Sebagian tool berjalan langsung di browser untuk menjaga privasi input, sementara fitur yang membutuhkan akses jaringan memakai API route server-side.
+Audit a website, investigate a domain, triage a suspicious file, or decode a CTF payload without shipping your secrets to someone else's server.
 
-## Fitur Utama
+[![CI](https://github.com/rapiip/cyberkit/actions/workflows/ci.yml/badge.svg)](https://github.com/rapiip/cyberkit/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 
-- Homepage berbasis tujuh tujuan pengguna dan command palette untuk mencari workflow atau capability.
-- Sebelas workspace yang dikelompokkan sebagai Core atau Utility, dengan Security Labs terpisah sebagai Experimental.
-- Website Security Audit dengan pengecekan HTTPS, DNS, SSL/TLS, security headers, CORS, cookie security, `robots.txt`, dan `security.txt`.
-- API route server-side untuk DNS, DoH, SSL, headers, CORS, CVE, RDAP, robots, security.txt, pwned password, IP lookup, indicator enrichment, dan audit agregat.
-- Saved reports yang tersimpan lokal, dengan ekspor Markdown/JSON/PDF.
-- Workspace report lintas tool: hasil beberapa capability panel dalam satu workspace dikumpulkan per sesi (hanya di memori), lalu dapat dirangkum menjadi satu report Markdown/JSON atau disimpan ke Saved Reports. Panel yang privacy-restricted tidak pernah masuk koleksi ini.
-- Cloud Sync terenkripsi end-to-end di browser menggunakan AES-256-GCM dan PBKDF2-SHA-256; server hanya menyimpan envelope ciphertext dengan expiry.
-- Data Transformation menampung encoding dan Secure Generator sebagai utility panel; CTF Decoder juga ditempatkan sebagai utility workflow.
-- Security Labs interaktif untuk SQL Injection, XSS, Auth Bypass, dan CSRF.
-- Riwayat eksekusi tool berbasis local storage.
+`11 workspaces` · `46 tools` · `4 interactive labs` · `0 telemetry`
 
-## Tech Stack
+</div>
 
-- Next.js 16.2.9
-- React 19
-- TypeScript 5
-- Tailwind CSS 4
-- Zustand
-- Framer Motion
-- jsPDF
-- Lucide React
-- ESLint 9
+---
 
-## Prasyarat
+## Why CyberKit
 
-- Node.js versi modern yang kompatibel dengan Next.js 16.
-- npm, karena repo ini sudah menyertakan `package-lock.json`.
+Most security tool collections are a wall of 50 identical input boxes. You already know what you want to accomplish, so CyberKit starts from the goal instead of the tool.
 
-## Menjalankan Lokal
+Pick an intent like *"audit a website"* or *"investigate a domain or IP"*, and you land in a workspace that already has the right panels open, keeps results from every panel in one place, and turns them into a single report when you are done.
 
-Install dependency:
+Three principles drive the design:
+
+| Principle | What it means in practice |
+| :--- | :--- |
+| **Privacy by default** | Passwords, JWTs, and secrets are processed in browser memory and never touch history, exports, analytics, or sync. |
+| **Explicit consent** | Third-party enrichment is opt in per request. No API key configured means nothing leaves your machine. |
+| **Honest results** | Heuristic output carries a confidence score. Rate limits degrade gracefully instead of silently returning empty data. |
+
+---
+
+## Highlights
+
+**Outcome-based navigation.** The workspace index groups all 11 workspaces into Core and Utility tiers, and every workspace carries the security goal it serves. A command palette (`Ctrl` + `K`, or `Cmd` + `K`) searches across workspace names, descriptions, goals, and individual capabilities.
+
+**Unified website audit.** One run covers HTTPS enforcement, DNS, SSL/TLS, security headers, CORS, cookie flags, `robots.txt`, and `security.txt`.
+
+**Cross-tool workspace reports.** Results from multiple panels in the same workspace collect per session in memory only, then export as a single Markdown or JSON report. Privacy-restricted panels never join the collection.
+
+**End-to-end encrypted Cloud Sync.** AES-256-GCM with PBKDF2-SHA-256 key derivation happens in the browser. The server stores an opaque ciphertext envelope with a TTL and cannot read it.
+
+**Breach checks that keep the password local.** SHA-1 hashing runs client side and only a five character prefix reaches the backend. Suffix matching against the returned HIBP range stays in the browser.
+
+**Local-first file triage.** EXIF, MIME, magic bytes, string extraction, and IOC parsing run against the file in your browser. Enrichment is a separate, explicit step.
+
+**Interactive security labs.** Hands-on SQL Injection, XSS, Auth Bypass, and CSRF exercises, kept deliberately separate from the operational analysis workflows.
+
+**Saved reports and history.** Persisted in local storage with Markdown, JSON, and PDF export.
+
+---
+
+## Workspaces
+
+<table>
+<tr><th align="left">Core</th><th align="left">What it does</th></tr>
+<tr><td><b>Website Security Audit</b></td><td>URL, header, TLS, CORS, policy, robots.txt, and security.txt assessment</td></tr>
+<tr><td><b>Domain &amp; IP Intelligence</b></td><td>DNS, DoH, RDAP, IP, ASN, geolocation, and reputation context</td></tr>
+<tr><td><b>File Triage &amp; IOC Analysis</b></td><td>Local file metadata, type, strings, hashes, and indicator extraction</td></tr>
+<tr><td><b>Secret Scanner</b></td><td>Secret and credential pattern discovery with privacy controls</td></tr>
+<tr><td><b>CVE / KEV Intelligence</b></td><td>CVE search enriched with CISA Known Exploited Vulnerabilities data</td></tr>
+<tr><td><b>JWT Inspector</b></td><td>Structure, claim, and optional signature inspection</td></tr>
+<tr><td><b>Password Security</b></td><td>Generation, zxcvbn strength estimation, and breach checks</td></tr>
+</table>
+
+<table>
+<tr><th align="left">Utility</th><th align="left">What it does</th></tr>
+<tr><td><b>Network Workbench</b></td><td>CIDR, subnet calculation, and common port reference</td></tr>
+<tr><td><b>Data Transformation</b></td><td>Composable encoding pipelines plus UUID and token generation</td></tr>
+<tr><td><b>CTF Decoder Workbench</b></td><td>Classical ciphers, Morse, XOR, and regex utilities</td></tr>
+<tr><td><b>Hash &amp; Crypto Workbench</b></td><td>Text and file hashing, HMAC, checksums, and hash format identification</td></tr>
+</table>
+
+Simple mini-tools are not top level menu items. Each capability lives as a tab or panel inside the workspace that owns it, and every legacy `/tools/<slug>` URL permanently redirects to `/workspaces/<workspace>?tool=<id>`.
+
+**Experimental:** Security Labs at `/labs`, isolated from the operational workflows.
+
+---
+
+## Quick Start
 
 ```bash
+git clone https://github.com/rapiip/cyberkit.git
+cd cyberkit/cyberkit-app
 npm install
+npm run dev
 ```
 
-Salin konfigurasi env contoh bila ingin mengaktifkan API key opsional atau Cloud Sync:
+Open **http://localhost:3001** and you are running.
+
+Everything above works with zero configuration. To unlock optional API keys or Cloud Sync:
 
 ```bash
 cp .env.example .env.local
 ```
 
-Jalankan development server:
-
-```bash
-npm run dev
-```
-
-Buka aplikasi di:
-
-```text
-http://localhost:3001
-```
-
-Build production:
+Production build:
 
 ```bash
 npm run build
+npm run start     # serves on port 3000
 ```
 
-Jalankan hasil build (default port 3000):
+**Prerequisites:** Node.js `>=20.9.0` and npm, since the repo ships a `package-lock.json`.
 
-```bash
-npm run start
-```
+---
 
-## Perintah Pemeriksaan
+## Verification
 
-Jalankan semuanya sekaligus sebelum commit atau publish:
+Run the full gate before you commit or publish:
 
 ```bash
 npm run verify
 ```
 
-`verify` menjalankan `lint`, `typecheck`, `test`, `build`, lalu `npm audit --audit-level=moderate`.
+That chains `lint`, `typecheck`, `test`, `build`, and `npm audit --audit-level=moderate`.
 
-Perintah individual:
+Individual commands:
 
 ```bash
 npm run lint        # ESLint
 npm run typecheck   # next typegen + tsc --noEmit
-npm test            # unit test, sepenuhnya offline
+npm test            # unit tests, fully offline and deterministic
 npm run test:e2e    # Playwright (chromium)
+npm run test:network  # hits real third-party endpoints, excluded from the default suite
 ```
 
-Beberapa test menghubungi endpoint pihak ketiga sungguhan dan sengaja dipisahkan
-dari suite default agar `npm test` tetap deterministik saat offline:
+`npm run test:e2e` uses `next dev` locally and `next start` when `CI` is set, so CI exercises the production output. Run `npm run build` first when using CI mode.
 
-```bash
-npm run test:network
-```
+---
 
-`npm run test:e2e` memakai `next dev` secara lokal dan `next start` bila variabel
-`CI` diset, sehingga di CI pengujian berjalan terhadap output produksi. Jalankan
-`npm run build` terlebih dahulu bila memakai mode CI.
-
-## Struktur Proyek
+## Architecture
 
 ```text
 src/
   app/
-    api/              API routes untuk scanner dan lookup server-side
-    audit/            Halaman website security audit
-    history/          Riwayat penggunaan tool
+    api/              Server-side scanner and lookup routes
+    audit/            Unified website security audit
+    history/          Tool usage history
     labs/             Security learning labs
-    reports/          Laporan tersimpan dan export
-    settings/         Pengaturan aplikasi
-    workspaces/       Katalog 11 workspace dan shell capability panels
-    tools/            Route kompatibilitas untuk URL mini-tool lama
+    reports/          Saved reports and export
+    settings/         Application settings
+    workspaces/       The 11 workspaces and their capability panel shells
+    tools/            Compatibility redirects for legacy mini-tool URLs
   components/
-    layout/           Sidebar dan command palette
+    layout/           Sidebar and command palette
   lib/
-    server/           Helper server-side scanner, timeout, rate limit, validasi target
-    store/            Zustand stores untuk history dan reports
-    tools/            Metadata, workspace registry, result schema, validasi, dan lazy executor
-    utils/            Helper umum dan export report
-public/               Asset statis
+    server/           Scanner helpers, timeouts, rate limiting, target validation
+    store/            Zustand stores for history and reports
+    tools/            Metadata, workspace registry, result schema, lazy executors
+    utils/            Shared helpers and report export
+public/               Static assets
 ```
 
-Audit arsitektur fase pertama, inventaris route/provider/storage, rancangan 11
-workspace, dan batasan migrasi tersedia di
-[`docs/architecture/phase-1-audit.md`](docs/architecture/phase-1-audit.md).
-Implementasi navigasi berbasis workflow dan tabel migrasi route dijelaskan di
-[`docs/architecture/phase-2-workspace-navigation.md`](docs/architecture/phase-2-workspace-navigation.md).
+Fifteen API routes back the server-side work: `audit`, `cors`, `cve`, `dns`, `doh`, `enrich`, `headers`, `health`, `ip`, `pwned-password`, `rdap`, `robots`, `security-txt`, `ssl`, and `sync`.
 
-## Workspace
+Deeper reading:
 
-- Core: Website Security Audit, Domain & IP Intelligence, JWT Inspector, Password Security, File Triage & IOC Analysis, Secret Scanner, dan CVE / KEV Intelligence.
-- Utility: Network Workbench, Data Transformation, CTF Decoder Workbench, dan Hash & Crypto Workbench.
-- Experimental: Security Labs, dipisahkan dari workflow analisis operasional.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) for the threat model, data flow, and coverage matrix
+- [`docs/architecture/phase-1-audit.md`](docs/architecture/phase-1-audit.md) for the route, provider, and storage inventory
+- [`docs/architecture/phase-2-workspace-navigation.md`](docs/architecture/phase-2-workspace-navigation.md) for the workflow navigation design and route migration table
+- [`docs/privacy/data-flow.md`](docs/privacy/data-flow.md) for exactly what each tool does and does not transmit
 
-Mini-tool sederhana tidak ditampilkan sebagai menu utama. Capability tersebut tersedia sebagai tab atau panel di workspace pemiliknya. Semua URL lama `/tools/<slug>` memakai permanent redirect ke `/workspaces/<workspace>?tool=<id>`.
+**Stack:** Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS 4, Zustand, Framer Motion, jsPDF, Lucide React, ESLint 9.
 
-## Catatan Keamanan
+---
 
-CyberKit ditujukan untuk pembelajaran, analisis defensif, CTF, dan audit pada sistem yang Anda miliki atau yang secara eksplisit mengizinkan pengujian. Jangan gunakan tool scanner untuk target pihak ketiga tanpa izin.
+## Security Notes
 
-API route server-side memiliki validasi target, timeout, batas ukuran respons, dan rate limit dasar agar request jaringan lebih terkendali. Tetap review batasan ini sebelum deployment publik.
+> **Scope.** CyberKit is built for learning, defensive analysis, CTFs, and auditing systems you own or have explicit written permission to test. Do not point the scanners at third-party targets without authorization.
 
-Respons dari target dibatasi saat streaming, bukan setelah seluruh body di-buffer, sehingga target yang mengirim body sangat besar tidak dapat menghabiskan memori server.
+**What the sensitive tools never persist.** The password generator, strength checker, Pwned Password checker, and JWT Inspector write nothing to history, reports, analytics, `localStorage`, exports, or Cloud Sync.
 
-Port keluar untuk target yang dimasukkan pengguna dibatasi pada daftar port web (default `80,443,591,3000,8000,8008,8080,8443,8888`, dapat diubah lewat `CYBERKIT_ALLOWED_OUTBOUND_PORTS`). Tanpa batasan ini, endpoint scanner dapat dipakai sebagai port prober terhadap layanan seperti SSH, MySQL, PostgreSQL, Redis, atau MongoDB pada host publik mana pun. Panggilan ke provider pihak ketiga tidak terpengaruh daftar ini.
+**Response streaming limits.** Target responses are capped while streaming rather than after the full body is buffered, so a hostile target cannot exhaust server memory by sending a huge payload.
 
-Geolokasi IP memakai `ipwho.is` melalui HTTPS. Provider sebelumnya menolak HTTPS pada tier gratis, sehingga IP atau domain yang sedang diselidiki terkirim dalam cleartext — membocorkan objek investigasi kepada pengamat jaringan di jalur tersebut.
+**Outbound port allowlist.** Scans against user-supplied targets are restricted to web ports (default `80,443,591,3000,8000,8008,8080,8443,8888`, configurable via `CYBERKIT_ALLOWED_OUTBOUND_PORTS`). Without this, the scan endpoints double as a port prober for SSH, MySQL, PostgreSQL, Redis, or MongoDB on any public host. Calls to third-party providers are unaffected.
 
-Jika `UPSTASH_REDIS_REST_URL` dan `UPSTASH_REDIS_REST_TOKEN` tersedia, CyberKit memakai Upstash Redis untuk cache TTL, rate limit, dan Cloud Sync. Tanpa env tersebut, mode lokal memakai bounded in-memory cache/rate-limit dan Cloud Sync akan nonaktif.
+**SSRF protection.** `resolveAndBlockPrivateIp` rejects loopback, private, link-local, IPv4-mapped IPv6, and decimal or hex encoded address forms.
 
-Header proxy seperti `x-forwarded-for` hanya dipercaya jika `CYBERKIT_TRUST_PROXY_HEADERS=true`. Aktifkan hanya di deployment yang mengontrol proxy chain.
+**Geolocation over HTTPS.** IP geolocation uses `ipwho.is` over HTTPS. The previous provider refused HTTPS on its free tier, which sent the IP or domain under investigation in cleartext and leaked the subject of the investigation to anyone on the network path.
 
-Penting untuk deployment publik: tanpa flag tersebut, alamat klien tidak dapat diketahui dari sebuah Route Handler, sehingga seluruh pengunjung berbagi satu bucket rate limit. Budget per-IP karenanya berperilaku sebagai budget global — satu pengguna yang sibuk dapat menghabiskannya untuk semua orang. Budget per-target tetap berlaku per hostname dan menjadi kontrol yang bermakna. Aplikasi mencatat peringatan satu kali saat berjalan di produksi tanpa flag ini. Sebaliknya, jangan aktifkan flag bila klien dapat mengirim header tersebut sendiri, karena header dapat dipalsukan untuk melewati rate limit.
+**Redis is optional but recommended.** With `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`, CyberKit uses Upstash Redis for TTL caching, rate limiting, and Cloud Sync. Without them it falls back to a bounded in-memory cache and rate limiter, and Cloud Sync is disabled.
 
-Pwned Password Checker melakukan SHA-1 hashing di browser dan hanya mengirim prefix lima karakter ke backend CyberKit. Backend mengembalikan range HIBP yang sudah diparse; pencocokan suffix tetap di browser.
+**Proxy headers require a deliberate opt in.** Headers like `x-forwarded-for` are trusted only when `CYBERKIT_TRUST_PROXY_HEADERS=true`.
 
-Password generator, strength checker, Pwned Password, dan JWT Inspector tidak menulis input atau output ke history, reports, analytics, `localStorage`, export data, atau Cloud Sync. Detail aliran data tersedia di [`docs/privacy/data-flow.md`](docs/privacy/data-flow.md).
+> ⚠️ **Read this before a public deployment.** Without that flag a Route Handler cannot determine the client address, so every visitor shares one rate-limit bucket and the per-IP budget behaves as a global budget. One busy user can drain it for everyone. The per-target budget still applies per hostname and remains a meaningful control. The app logs a one-time warning when it runs in production without the flag. Conversely, do not enable it where clients can set the header themselves, because a forged header bypasses the limit.
 
-IOC enrichment bersifat opt-in eksplisit. Secara default IOC Extractor hanya bekerja lokal. Bila Anda mencentang "Explicitly allow provider enrichment" dan deployment punya `VIRUSTOTAL_API_KEY`, `ABUSEIPDB_API_KEY`, atau `URLHAUS_AUTH_KEY`, indikator yang lolos validasi lokal dikirim ke provider tersebut melalui `/api/enrich`. Tanpa API key, route mengembalikan `503 ENRICHMENT_NOT_CONFIGURED` dan tidak ada indikator yang keluar dari browser.
+**IOC enrichment is opt in, twice over.** By default the IOC Extractor works purely locally. Indicators reach `/api/enrich` only when you tick *"Explicitly allow provider enrichment"* **and** the deployment has `VIRUSTOTAL_API_KEY`, `ABUSEIPDB_API_KEY`, or `URLHAUS_AUTH_KEY` configured. Without a key the route returns `503 ENRICHMENT_NOT_CONFIGURED` and no indicator leaves the browser.
+
+Found a vulnerability? See [`SECURITY.md`](SECURITY.md).
+
+---
 
 ## Environment Variables
 
-Lihat `.env.example` untuk daftar lengkap:
+See [`.env.example`](.env.example) for the annotated list.
 
-- `NEXT_PUBLIC_APP_URL`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-- `CYBERKIT_TRUST_PROXY_HEADERS`
-- `CYBERKIT_ALLOWED_OUTBOUND_PORTS`
-- `CLOUD_SYNC_RETENTION_DAYS` (default 30, minimum 1, maksimum 90)
-- `NVD_API_KEY`
-- `SECURITYTRAILS_API_KEY`
-- `ABUSEIPDB_API_KEY`
-- `SHODAN_API_KEY`
-- `VIRUSTOTAL_API_KEY`
-- `URLHAUS_AUTH_KEY`
+| Variable | Purpose |
+| :--- | :--- |
+| `NEXT_PUBLIC_APP_URL` | Public URL used for metadata, sitemap, and robots.txt |
+| `UPSTASH_REDIS_REST_URL` | Redis REST endpoint for cache, rate limiting, and Cloud Sync |
+| `UPSTASH_REDIS_REST_TOKEN` | Token paired with the Redis URL |
+| `CLOUD_SYNC_RETENTION_DAYS` | Encrypted sync retention, 1 to 90, default 30 |
+| `CYBERKIT_TRUST_PROXY_HEADERS` | Trust proxy-supplied client IP headers, default `false` |
+| `CYBERKIT_ALLOWED_OUTBOUND_PORTS` | Comma-separated outbound port allowlist for scans |
+| `NVD_API_KEY` | Higher-rate CVE lookups |
+| `SECURITYTRAILS_API_KEY` | DNS history enrichment |
+| `ABUSEIPDB_API_KEY` | IP reputation enrichment |
+| `SHODAN_API_KEY` | Exposed-service enrichment |
+| `VIRUSTOTAL_API_KEY` | IP and file reputation enrichment |
+| `URLHAUS_AUTH_KEY` | Malicious URL and IP context |
+
+All API keys are optional. Features that depend on a missing key degrade to a clear "not configured" response rather than failing silently.
+
+---
 
 ## Deployment
 
-Aplikasi dapat dideploy ke platform yang mendukung Next.js App Router. Untuk deployment production, perhatikan:
+CyberKit deploys to any platform that supports the Next.js App Router. Before going public:
 
-- Batasi akses atau rate limit endpoint scanner.
-- Review kebijakan outbound network request dari hosting.
-- Pastikan fitur yang memanggil API publik pihak ketiga sesuai dengan limit dan terms masing-masing layanan.
-- Jalankan `npm run build` sebelum publish.
+1. Run `npm run build` and confirm `npm run verify` passes.
+2. Restrict access to or rate limit the scanner endpoints.
+3. Set `CYBERKIT_TRUST_PROXY_HEADERS=true` only if you control the entire proxy chain.
+4. Review your host's outbound network request policy.
+5. Confirm your usage of each third-party public API fits its rate limits and terms.
+
+---
+
+## License
+
+[MIT](LICENSE)
